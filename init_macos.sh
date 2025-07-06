@@ -200,8 +200,8 @@ fi
 
 # --- Enhanced CLI Utilities ---
 
-echo "Installing enhanced CLI tools (bat, exa, ripgrep, jq)..."
-brew install bat exa ripgrep jq
+echo "Installing enhanced CLI tools (bat, eza, ripgrep, jq)..."
+brew install bat eza ripgrep jq
 INSTALLED_PACKAGES+=("Enhanced CLI Tools (bat, exa, ripgrep, jq)")
 
 echo "
