@@ -84,6 +84,18 @@ else
   ALREADY_SETUP_PACKAGES+=("Powerlevel10k theme set in Zsh config")
 fi
 
+# Install fzf
+echo "Installing fzf..."
+if ! command -v fzf &> /dev/null; then
+  brew install fzf
+  # Install fzf key bindings and fuzzy completion
+  "$(brew --prefix)/opt/fzf/install" --all --no-bash --no-fish
+  INSTALLED_PACKAGES+=("fzf (and key bindings/completion)")
+else
+  echo "fzf is already installed."
+  ALREADY_SETUP_PACKAGES+=("fzf")
+fi
+
 # Install Ghostty
 echo "Installing Ghostty..."
 if ! brew list --cask ghostty &>/dev/null; then
