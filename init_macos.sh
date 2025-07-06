@@ -64,6 +64,16 @@ else
   ALREADY_SETUP_PACKAGES+=("Oh My Zsh")
 fi
 
+# Install Git
+echo "Installing Git..."
+if ! command -v git &> /dev/null; then
+  brew install git
+  INSTALLED_PACKAGES+=("Git")
+else
+  echo "Git is already installed."
+  ALREADY_SETUP_PACKAGES+=("Git")
+fi
+
 # Install Powerlevel10k theme
 echo "Installing Powerlevel10k theme..."
 if [ ! -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k" ]; then
@@ -163,6 +173,36 @@ else
   echo "Zen Browser is already installed."
   ALREADY_SETUP_PACKAGES+=("Zen Browser")
 fi
+
+
+# Install Docker Desktop
+echo "Installing Docker..."
+if ! brew list --cask docker &>/dev/null; then
+  brew install --cask docker
+  INSTALLED_PACKAGES+=("Docker")
+else
+  echo "Docker is already installed."
+  ALREADY_SETUP_PACKAGES+=("Docker")
+fi
+
+# --- Additional Productivity Applications ---
+
+# Install Rectangle (Window Manager)
+echo "Installing Rectangle..."
+if ! brew list --cask rectangle &>/dev/null; then
+  brew install --cask rectangle
+  INSTALLED_PACKAGES+=("Rectangle")
+else
+  echo "Rectangle is already installed."
+  ALREADY_SETUP_PACKAGES+=("Rectangle")
+fi
+
+
+# --- Enhanced CLI Utilities ---
+
+echo "Installing enhanced CLI tools (bat, exa, ripgrep, jq)..."
+brew install bat exa ripgrep jq
+INSTALLED_PACKAGES+=("Enhanced CLI Tools (bat, exa, ripgrep, jq)")
 
 echo "
 
