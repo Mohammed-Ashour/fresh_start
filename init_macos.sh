@@ -63,7 +63,7 @@ else
   echo "Oh My Zsh is already installed."
   ALREADY_SETUP_PACKAGES+=("Oh My Zsh")
 fi
-
+# --- Install Git ---
 # Install Git
 echo "Installing Git..."
 if ! command -v git &> /dev/null; then
@@ -73,6 +73,20 @@ else
   echo "Git is already installed."
   ALREADY_SETUP_PACKAGES+=("Git")
 fi
+
+# install lazygit
+echo "Installing lazygit..."
+if ! command -v lazygit &> /dev/null; then
+  brew install lazygit
+  INSTALLED_PACKAGES+=("lazygit")
+else
+  echo "lazygit is already installed."
+  ALREADY_SETUP_PACKAGES+=("lazygit")
+fi
+
+# ----
+
+# --- Install Zsh plugins ---
 
 # Install Powerlevel10k theme
 echo "Installing Powerlevel10k theme..."
@@ -183,6 +197,16 @@ if ! brew list --cask docker &>/dev/null; then
 else
   echo "Docker is already installed."
   ALREADY_SETUP_PACKAGES+=("Docker")
+fi
+
+# Install lazydocker
+echo "Installing lazydocker..."
+if ! command -v lazydocker &> /dev/null; then
+  brew install lazydocker
+  INSTALLED_PACKAGES+=("lazydocker")
+else
+  echo "lazydocker is already installed."
+  ALREADY_SETUP_PACKAGES+=("lazydocker")
 fi
 
 # Install Kubectl
