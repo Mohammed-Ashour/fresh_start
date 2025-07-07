@@ -190,13 +190,14 @@ fi
 
 
 # Install Docker Desktop
-echo "Installing Docker..."
-if ! brew list --cask docker &>/dev/null; then
-  brew install --cask docker
-  INSTALLED_PACKAGES+=("Docker")
+// Check if Docker is already installed
+if [ -d "/Applications/Docker.app" ]; then
+    echo "Docker is already installed."
+    ALREADY_SETUP_PACKAGES+=("Docker")
 else
-  echo "Docker is already installed."
-  ALREADY_SETUP_PACKAGES+=("Docker")
+    echo "Docker is not installed. Installing Docker..."
+    brew install --cask docker
+    INSTALLED_PACKAGES+=("Docker")
 fi
 
 # Install lazydocker
@@ -238,25 +239,35 @@ else
   echo "Minikube is already installed."
   ALREADY_SETUP_PACKAGES+=("Minikube")
 fi
+# Install K9s
+echo "Installing K9s..."
+if ! command -v k9s &> /dev/null; then
+  brew install derailed/k9s/k9s
+  INSTALLED_PACKAGES+=("K9s")
+else
+  echo "K9s is already installed."
+  ALREADY_SETUP_PACKAGES+=("K9s")
+fi
+
 
 
 # --- Additional Productivity Applications ---
 
 # Install Rectangle (Window Manager)
-echo "Installing Rectangle..."
-if ! brew list --cask rectangle &>/dev/null; then
-  brew install --cask rectangle
-  INSTALLED_PACKAGES+=("Rectangle")
+if [ -d "/Applications/Rectangle.app" ]; then
+    echo "Rectangle is already installed."
+    ALREADY_SETUP_PACKAGES+=("Rectangle")
 else
-  echo "Rectangle is already installed."
-  ALREADY_SETUP_PACKAGES+=("Rectangle")
+    echo "Rectangle is not installed. Installing Rectangle..."
+    brew install --cask rectangle
+    INSTALLED_PACKAGES+=("Rectangle")
 fi
 
 # --- Install Zellij  Terminal  Multiplexer ---
 
-# Install Zellij
-echo "Installing zellij..."
-if ! brew list --cask zellij &>/dev/null; then
+# Install Zellij Terminal Multiplexer
+echo "Installing Zellij..."
+if ! command -v zellij &> /dev/null; then
   brew install zellij
   INSTALLED_PACKAGES+=("Zellij")
 else
@@ -264,12 +275,33 @@ else
   ALREADY_SETUP_PACKAGES+=("Zellij")
 fi
 
-
 # --- Enhanced CLI Utilities ---
 
 echo "Installing enhanced CLI tools (bat, eza, ripgrep, jq)..."
-brew install bat eza ripgrep jq
-INSTALLED_PACKAGES+=("Enhanced CLI Tools (bat, exa, ripgrep, jq)")
+if ! command -v bat &> /dev/null; then
+  echo "Installing bat..."
+  brew install bat
+  INSTALLED_PACKAGES+=("bat")
+else
+  echo "bat is already installed."
+  ALREADY_SETUP_PACKAGES+=("bat")
+fi
+if ! command -v eza &> /dev/null; then
+  echo "Installing eza..."
+  brew install eza
+  INSTALLED_PACKAGES+=("eza")
+else
+  echo "eza is already installed."
+  ALREADY_SETUP_PACKAGES+=("eza")
+fi
+if ! command -v rg &> /dev/null; then
+  echo "Installing ripgrep (rg)..."
+  brew install ripgrep
+  INSTALLED_PACKAGES+=("ripgrep")
+else
+  echo "ripgrep (rg) is already installed."
+  ALREADY_SETUP_PACKAGES+=("ripgrep")
+fi
 
 echo "
 
