@@ -185,6 +185,37 @@ else
   ALREADY_SETUP_PACKAGES+=("Docker")
 fi
 
+# Install Kubectl
+echo "Installing kubectl..."
+if ! command -v kubectl &> /dev/null; then
+  brew install kubectl
+  INSTALLED_PACKAGES+=("kubectl")
+else
+  echo "kubectl is already installed."
+  ALREADY_SETUP_PACKAGES+=("kubectl")
+fi
+
+# Install Helm
+echo "Installing Helm..."
+if ! command -v helm &> /dev/null; then
+  brew install helm
+  INSTALLED_PACKAGES+=("Helm")  
+else
+  echo "Helm is already installed."
+  ALREADY_SETUP_PACKAGES+=("Helm")
+fi
+
+# Install Minikube
+echo "Installing Minikube..."
+if ! command -v minikube &> /dev/null; then
+  brew install minikube
+  INSTALLED_PACKAGES+=("Minikube")
+else
+  echo "Minikube is already installed."
+  ALREADY_SETUP_PACKAGES+=("Minikube")
+fi
+
+
 # --- Additional Productivity Applications ---
 
 # Install Rectangle (Window Manager)
@@ -197,6 +228,18 @@ else
   ALREADY_SETUP_PACKAGES+=("Rectangle")
 fi
 
+# --- Install Zellij  Terminal  Multiplexer ---
+
+# Install Zellij
+echo "Installing zellij..."
+if ! brew list --cask zellij &>/dev/null; then
+  brew install zellij
+  INSTALLED_PACKAGES+=("Zellij")
+else
+  echo "Zellij is already installed."
+  ALREADY_SETUP_PACKAGES+=("Zellij")
+fi
+
 
 # --- Enhanced CLI Utilities ---
 
@@ -205,6 +248,9 @@ brew install bat eza ripgrep jq
 INSTALLED_PACKAGES+=("Enhanced CLI Tools (bat, exa, ripgrep, jq)")
 
 echo "
+
+
+
 
 ████████████████████████████████████████████████████████████████████████████████
 █                                                                              █
