@@ -188,6 +188,17 @@ else
   ALREADY_SETUP_PACKAGES+=("Zen Browser")
 fi
 
+# Install Obsidian
+echo "Installing Obsidian..."
+if ! brew list --cask obsidian &>/dev/null; then
+  brew install --cask obsidian
+  INSTALLED_PACKAGES+=("Obsidian")
+else
+  echo "Obsidian is already installed."
+  ALREADY_SETUP_PACKAGES+=("Obsidian")
+fi
+
+
 
 # Install Docker Desktop
 // Check if Docker is already installed
