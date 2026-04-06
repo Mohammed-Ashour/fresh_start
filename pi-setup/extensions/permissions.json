@@ -1,0 +1,41 @@
+{
+  "mode": "acceptEdits",
+  "dangerousPatterns": [
+    { "pattern": "rm -rf", "description": "recursive force delete" },
+    { "pattern": "chmod -R 777", "description": "insecure recursive permissions" },
+    { "pattern": "chown -R", "description": "recursive ownership change" },
+    { "pattern": "> /dev/", "description": "direct device write" }
+  ],
+  "catastrophicPatterns": [
+    { "pattern": "sudo rm -rf /", "description": "sudo recursive delete root" },
+    { "pattern": "sudo rm -rf /*", "description": "sudo recursive delete root contents" },
+    { "pattern": "rm -rf /", "description": "recursive delete root" },
+    { "pattern": "rm -rf /*", "description": "recursive delete root contents" },
+    { "pattern": "sudo mkfs", "description": "sudo filesystem format" },
+    { "pattern": "mkfs.", "description": "filesystem format" },
+    { "pattern": "dd if=", "description": "raw disk write" },
+    { "pattern": ":(){ :|:& };:", "description": "fork bomb" },
+    { "pattern": "sudo chmod -R 777 /", "description": "sudo open all permissions on root" },
+    { "pattern": "sudo chown -R", "description": "sudo recursive ownership change" },
+    { "pattern": "> /dev/sda", "description": "overwrite disk" },
+    { "pattern": "> /dev/nvme", "description": "overwrite disk" },
+    { "pattern": "sudo dd", "description": "sudo raw disk operation" }
+  ],
+  "protectedPaths": [
+    "~/.ssh",
+    "~/.aws",
+    "~/.gnupg",
+    "~/.gpg",
+    "~/.bashrc",
+    "~/.bash_profile",
+    "~/.profile",
+    "~/.zshrc",
+    "~/.zprofile",
+    "~/.config/git/credentials",
+    "~/.netrc",
+    "~/.npmrc",
+    "~/.docker/config.json",
+    "~/.kube/config",
+    "~/.pi/agent/auth.json"
+  ]
+}
