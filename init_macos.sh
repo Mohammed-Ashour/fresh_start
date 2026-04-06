@@ -28,6 +28,22 @@ CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
+# Box drawing constants
+BOX_WIDTH=68  # Inner width (excluding border characters)
+
+# Function to print a box line with proper padding
+box_line() {
+    local content="$1"
+    local len=${#content}
+    local padding=$((BOX_WIDTH - len))
+    printf "║ %s%${padding}s ║\n" "$content" ""
+}
+
+# Function to print a separator line
+box_sep() {
+    echo "╠══════════════════════════════════════════════════════════════════════╣"
+}
+
 # Arrays to store installation status
 INSTALLED_PACKAGES=()
 ALREADY_SETUP_PACKAGES=()
@@ -408,39 +424,38 @@ setup_pi_extensions() {
 # ───────────────────────────────────────────────────────────────────────────
 show_menu() {
     echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║                    Fresh macOS Setup Menu                        ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║  1) Core          - Homebrew, Zsh, Oh My Zsh, Git              ║"
-    echo "║  2) Dev Tools     - VS Code, lazygit, fzf, tmux                ║"
-    echo "║  3) Productivity  - Ghostty, Rectangle, Obsidian, Zen          ║"
-    echo "║                   - Bitwarden                                    ║"
-    echo "║  4) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s       ║"
-    echo "║  5) CLI Tools     - bat, eza, ripgrep, zellij                 ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║  6) Pi Extensions - web-search, exit, permissions             ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║  A) Install All   - Run all categories above                    ║"
-    echo "║  C) Custom Select - Choose specific categories                 ║"
-    echo "║  Q) Quit          - Exit without installing                     ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════════════╗"
+    box_line "Fresh macOS Setup Menu"
+    box_sep
+    box_line "1) Core          - Homebrew, Zsh, Oh My Zsh, Git"
+    box_line "2) Dev Tools     - VS Code, lazygit, fzf, tmux"
+    box_line "3) Productivity  - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
+    box_line "4) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
+    box_line "5) CLI Tools     - bat, eza, ripgrep, zellij"
+    box_sep
+    box_line "6) Pi Extensions - web-search, exit, permissions"
+    box_sep
+    box_line "A) Install All   - Run all categories above"
+    box_line "C) Custom Select - Choose specific categories"
+    box_line "Q) Quit         - Exit without installing"
+    echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
 custom_selection() {
     echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║                  Custom Category Selection                      ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║  Select categories (e.g., '1 3 6'):                             ║"
-    echo "║                                                                  ║"
-    echo "║  1  - Core             (Homebrew, Zsh, Git)                    ║"
-    echo "║  2  - Dev Tools         (VS Code, lazygit, fzf, tmux)           ║"
-    echo "║  3  - Productivity      (Ghostty, Rectangle, Obsidian, Zen)    ║"
-    echo "║  4  - Kubernetes        (Docker, kubectl, Helm, Minikube, K9s)  ║"
-    echo "║  5  - CLI Tools         (bat, eza, ripgrep, zellij)            ║"
-    echo "║  6  - Pi Extensions     (web-search, exit, permissions)        ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════════════╗"
+    box_line "Custom Category Selection"
+    box_sep
+    box_line "Select categories (e.g., '1 3 6'):"
+    box_line ""
+    box_line "1  - Core          (Homebrew, Zsh, Git)"
+    box_line "2  - Dev Tools     (VS Code, lazygit, fzf, tmux)"
+    box_line "3  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
+    box_line "4  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
+    box_line "5  - CLI Tools     (bat, eza, ripgrep, zellij)"
+    box_line "6  - Pi Extensions (web-search, exit, permissions)"
+    echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -n "Enter selection: "
     read -r selection
@@ -462,9 +477,9 @@ custom_selection() {
 # ───────────────────────────────────────────────────────────────────────────
 show_summary() {
     echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                       SETUP SUMMARY${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                         SETUP SUMMARY${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
     echo ""
     
     echo "Installed:"
@@ -487,9 +502,9 @@ show_summary() {
     fi
     
     echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                      SETUP COMPLETE${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                        SETUP COMPLETE${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
     echo ""
 }
 
@@ -499,12 +514,12 @@ show_summary() {
 main() {
     # Header
     echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║                    Fresh macOS Setup                            ║"
-    echo "║              Modular Development Environment                    ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║  Select an option to begin or press Ctrl+C to exit              ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════════════╗"
+    box_line "Fresh macOS Setup"
+    box_line "Modular Development Environment"
+    box_sep
+    box_line "Select an option to begin or press Ctrl+C to exit"
+    echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
     if [[ "$DRY_RUN" == "true" ]]; then
