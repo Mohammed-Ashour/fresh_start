@@ -13,7 +13,7 @@
 #   ./init_macos.sh --dry-run          # Show what would be done
 #
 # Categories:
-#   core, dev-tools, productivity, kubernetes, pi, pi-extensions, pi-setup
+#   core, dev-tools, productivity, kubernetes, cli-tools, pi-extensions
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -406,73 +406,6 @@ setup_pi_extensions() {
 }
 
 # ───────────────────────────────────────────────────────────────────────────
-# PI SETUP (Settings + MCP, no extensions)
-# ───────────────────────────────────────────────────────────────────────────
-setup_pi_config() {
-    announce "Pi Config (Settings + MCP)"
-    
-    PI_SETUP_DIR="$(dirname "$0")/pi-setup"
-    
-    if [[ -d "$PI_SETUP_DIR" ]]; then
-        echo "Setting up pi configuration..."
-        echo "  Source: $PI_SETUP_DIR"
-        echo ""
-        
-        PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
-        echo "  Target: $PI_DIR"
-        echo ""
-        
-        # Setup config files
-        if [[ -f "$PI_SETUP_DIR/config/settings.json" ]]; then
-            if [[ -f "$PI_DIR/settings.json" ]]; then
-                echo -e "  ${YELLOW}↺${NC} settings.json (already exists)"
-                mark_already "Pi Settings"
-            else
-                mkdir -p "$PI_DIR"
-                cp "$PI_SETUP_DIR/config/settings.json" "$PI_DIR/settings.json"
-                echo -e "  ${GREEN}✓${NC} settings.json"
-                mark_installed "Pi Settings"
-            fi
-        fi
-        
-        if [[ -f "$PI_SETUP_DIR/config/mcp.json" ]]; then
-            if [[ -f "$PI_DIR/mcp.json" ]]; then
-                echo -e "  ${YELLOW}↺${NC} mcp.json (already exists)"
-                mark_already "Pi MCP Config"
-            else
-                cp "$PI_SETUP_DIR/config/mcp.json" "$PI_DIR/mcp.json"
-                echo -e "  ${GREEN}✓${NC} mcp.json"
-                mark_installed "Pi MCP Config"
-            fi
-        fi
-        
-        echo ""
-        echo "Next steps:"
-        echo "  1. Run: ./pi-extensions/setup.sh (to install extensions)"
-        echo "  2. Restart pi or run: /reload"
-    else
-        echo -e "${RED}✗${NC} pi-setup directory not found"
-        mark_already "Pi Config (skipped - not found)"
-    fi
-}
-
-# ───────────────────────────────────────────────────────────────────────────
-# FULL PI SETUP
-# ───────────────────────────────────────────────────────────────────────────
-setup_pi() {
-    announce "Full Pi Setup"
-    echo "This includes: pi-extensions + pi-config + pi-setup"
-    echo ""
-    
-    setup_pi_config
-    setup_pi_extensions
-    
-    echo ""
-    echo "Pi setup complete!"
-    echo "Restart pi or run /reload to apply changes."
-}
-
-# ───────────────────────────────────────────────────────────────────────────
 # INTERACTIVE MENU
 # ───────────────────────────────────────────────────────────────────────────
 show_menu() {
@@ -487,8 +420,6 @@ show_menu() {
     echo "║  5) CLI Tools            - bat, eza, ripgrep, zellij            ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║  6) Pi Extensions        - web-search, exit, permissions        ║"
-    echo "║  7) Pi Config            - settings.json, mcp.json               ║"
-    echo "║  8) Full Pi Setup        - All pi components                     ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║  A) Install All           - Run all categories above             ║"
     echo "║  C) Custom Selection      - Choose specific categories           ║"
@@ -510,7 +441,6 @@ custom_selection() {
     echo "║  4  - Kubernetes        (Docker, kubectl, Helm, Minikube, K9s)  ║"
     echo "║  5  - CLI Tools         (bat, eza, ripgrep, zellij)            ║"
     echo "║  6  - Pi Extensions     (web-search, exit, permissions)        ║"
-    echo "║  7  - Pi Config         (settings.json, mcp.json)              ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -n "Enter selection: "
@@ -524,7 +454,6 @@ custom_selection() {
             4) setup_kubernetes ;;
             5) setup_cli_tools ;;
             6) setup_pi_extensions ;;
-            7) setup_pi_config ;;
         esac
     done
 }
@@ -590,10 +519,8 @@ main() {
             productivity) setup_productivity ;;
             kubernetes|k8s) setup_kubernetes ;;
             cli-tools|clitools) setup_cli_tools ;;
-            pi) setup_pi ;;
             pi-extensions|piextensions) setup_pi_extensions ;;
-            pi-setup|piconfig) setup_pi_config ;;
-            all) setup_core; setup_dev_tools; setup_productivity; setup_kubernetes; setup_cli_tools; setup_pi ;;
+            all) setup_core; setup_dev_tools; setup_productivity; setup_kubernetes; setup_cli_tools; setup_pi_extensions ;;
             *)
                 echo -e "${RED}Unknown category: $CATEGORY${NC}"
                 echo "Use --help to see available categories"
@@ -621,15 +548,13 @@ main() {
             4) setup_kubernetes ;;
             5) setup_cli_tools ;;
             6) setup_pi_extensions ;;
-            7) setup_pi_config ;;
-            8) setup_pi ;;
             a|A) 
                 setup_core
                 setup_dev_tools
                 setup_productivity
                 setup_kubernetes
                 setup_cli_tools
-                setup_pi
+                setup_pi_extensions
                 ;;
             c|C) custom_selection ;;
             q|Q) echo "Exiting..."; exit 0 ;;
