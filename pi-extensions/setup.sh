@@ -8,7 +8,8 @@
 # Extensions included:
 # - web-search.ts: Web search and fetch tools
 # - exit-command.ts: /exit as alias for /quit
-# - permissions.json: Permission modes configuration
+# - permission-gate.ts: Permission gate for dangerous commands (uses permissions.json)
+# - permissions.json: Permission modes configuration for permission-gate.ts
 #
 # Usage:
 #   ./setup.sh              # Interactive mode
@@ -168,6 +169,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
                     echo -e "  ${GREEN}✓${NC} exit-command.ts - /exit as alias for /quit"
                     ((INSTALLED_COUNT++))
                     ;;
+                permission-gate.ts)
+                    echo -e "  ${GREEN}✓${NC} permission-gate.ts - Dangerous command gate (uses permissions.json)"
+                    ((INSTALLED_COUNT++))
+                    ;;
                 permissions.json)
                     echo -e "  ${GREEN}✓${NC} permissions.json - Permission modes configuration"
                     echo "      Mode: acceptEdits (edits auto-allow, bash confirms, dangerous blocked)"
@@ -197,7 +202,8 @@ echo "Installed extensions:"
 if [[ $INSTALLED_COUNT -gt 0 ]]; then
     echo "  • web-search.ts - Web search and fetch"
     echo "  • exit-command.ts - /exit command alias"
-    echo "  • permissions.json - Permission modes"
+    echo "  • permission-gate.ts - Permission gate for dangerous commands"
+    echo "  • permissions.json - Permission modes configuration"
 else
     echo "  (none - all were already installed or not found)"
 fi
