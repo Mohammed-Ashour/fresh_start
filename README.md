@@ -12,7 +12,9 @@ fresh_start/
 │   └── extensions/
 │       ├── web-search.ts
 │       ├── exit-command.ts
-│       └── permissions.json
+│       ├── permission-gate.ts
+│       ├── permissions.json
+│       └── share-local.ts
 └── README.md
 ```
 
@@ -49,7 +51,7 @@ fresh_start/
 | `productivity` | Productivity apps | Ghostty, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | K8s tooling | Docker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | Enhanced CLI | bat, eza, ripgrep, zellij |
-| `pi-extensions` | Pi coding agent extensions | web-search, exit-command, permissions |
+| `pi-extensions` | Pi coding agent extensions | web-search, exit-command, permission-gate, share-local |
 
 ## Pi Extensions
 
@@ -65,10 +67,23 @@ Or via the main script:
 ### Included Extensions
 
 **web-search.ts** - Web search and fetch via DuckDuckGo
+- `web_search` - Search the web using DuckDuckGo
+- `web_fetch` - Fetch content from URLs as markdown
 
 **exit-command.ts** - `/exit` as alias for `/quit`
 
-**permissions.json** - Permission modes (acceptEdits by default)
+**permission-gate.ts** - Permission gate for dangerous commands
+- Blocks catastrophic commands (e.g., `rm -rf /`, `dd if=`, fork bombs)
+- Confirms dangerous commands before running
+- Protects sensitive paths from write/edit operations
+- Supports three modes: `acceptEdits`, `confirmAll`, `blockAll`
+
+**permissions.json** - Configuration for permission-gate.ts
+
+**share-local.ts** - Export session to HTML and open locally
+- `/share-local` - Export and open in Chrome
+- `/share-local --path` - Show path only
+- `/share-local --copy` - Copy path to clipboard
 
 ### Permission Modes
 

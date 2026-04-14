@@ -10,6 +10,7 @@
 # - exit-command.ts: /exit as alias for /quit
 # - permission-gate.ts: Permission gate for dangerous commands (uses permissions.json)
 # - permissions.json: Permission modes configuration for permission-gate.ts
+# - share-local.ts: Export session to HTML and open in browser
 #
 # Usage:
 #   ./setup.sh              # Interactive mode
@@ -178,6 +179,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
                     echo "      Mode: acceptEdits (edits auto-allow, bash confirms, dangerous blocked)"
                     ((INSTALLED_COUNT++))
                     ;;
+                share-local.ts)
+                    echo -e "  ${GREEN}✓${NC} share-local.ts - Export session to HTML and open locally"
+                    ((INSTALLED_COUNT++))
+                    ;;
                 *)
                     echo -e "  ${GREEN}✓${NC} $name"
                     ((INSTALLED_COUNT++))
@@ -204,6 +209,7 @@ if [[ $INSTALLED_COUNT -gt 0 ]]; then
     echo "  • exit-command.ts - /exit command alias"
     echo "  • permission-gate.ts - Permission gate for dangerous commands"
     echo "  • permissions.json - Permission modes configuration"
+    echo "  • share-local.ts - Export session to HTML and open in browser"
 else
     echo "  (none - all were already installed or not found)"
 fi

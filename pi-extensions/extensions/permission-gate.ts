@@ -12,7 +12,8 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve, homedir } from "node:path";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 
 interface DangerousPattern {
 	pattern: string;
