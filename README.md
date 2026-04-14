@@ -87,21 +87,19 @@ Or via the main script:
 
 ### Permission Modes
 
-Claude Code-style permission modes:
+Configurable via `permissions.json`:
 
 | Mode | Write | Normal Bash | Dangerous Bash | Catastrophic |
 |------|-------|-------------|----------------|--------------|
-| `default` | ❓ Confirm | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
-| `acceptEdits` | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
-| `fullAuto` | ✅ Auto | ✅ Auto | ❓ Confirm | 🚫 Blocked |
-| `bypassPermissions` | ✅ Auto | ✅ Auto | ✅ Auto | 🚫 Blocked |
+| `acceptEdits` (default) | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
+| `confirmAll` | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
+| `blockAll` | 🚫 Blocked | 🚫 Blocked | 🚫 Blocked | 🚫 Blocked |
 
-Commands:
-- `/permissions` - Interactive mode selector
-- `/permissions <mode>` - Set mode directly
-- `/permissions:status` - Show current mode
+**Dangerous patterns** (require confirmation): `rm -rf`, `chmod -R 777`, `chown -R`, device writes
 
-Keyboard: **Ctrl+Shift+P** — Cycle through modes
+**Catastrophic patterns** (always blocked): `rm -rf /`, `sudo mkfs`, `dd if=`, fork bombs, disk overwrites
+
+**Protected paths** (write/edit blocked): `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube/config`, `~/.pi/agent/auth.json`
 
 ## After Setup
 
