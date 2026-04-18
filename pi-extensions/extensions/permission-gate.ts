@@ -59,7 +59,7 @@ const MODES: { id: PermissionMode; label: string; description: string; icon: str
 	{ id: "default", label: "Default", description: "Confirm every write, edit, and bash command", icon: "⏵" },
 	{ id: "acceptEdits", label: "Accept Edits", description: "Allow write/edit silently, confirm bash", icon: "⏵⏵" },
 	{ id: "fullAuto", label: "Full Auto", description: "Allow write/edit/bash, confirm dangerous only", icon: "⏵⏵⏵" },
-	{ id: "safeMode", label: "Safe Mode", description: "Allow everything, silently block dangerous commands", icon: "⏵⏵⏵" },
+	{ id: "safeMode", label: "Safe Mode", description: "Allow everything, silently block dangerous commands", icon: "🛡" },
 	{ id: "bypassPermissions", label: "Bypass Permissions", description: "Allow everything, block catastrophic only", icon: "⏵⏵⏵⏵" },
 	{ id: "plan", label: "Plan Mode", description: "Read + markdown files only", icon: "📝" },
 ];
@@ -72,7 +72,6 @@ const DEFAULT_DANGEROUS: PatternRule[] = [
 	{ pattern: "rm -rf", description: "recursive force delete" },
 	{ pattern: "chmod -R 777", description: "insecure recursive permissions" },
 	{ pattern: "chown -R", description: "recursive ownership change" },
-	{ pattern: "> /dev/", description: "direct device write" },
 	{ pattern: "curl.*\\|.*sh", description: "pipe download to shell execution" },
 	{ pattern: "wget.*\\|.*sh", description: "pipe download to shell execution" },
 	{ pattern: "python.*\\|.*sh", description: "pipe python to shell execution" },
@@ -90,7 +89,7 @@ const DEFAULT_DANGEROUS: PatternRule[] = [
 	{ pattern: "chmod -R 777 /", description: "recursive open permissions on root" },
 	{ pattern: "eval.*\\$\\(", description: "eval with command substitution" },
 	{ pattern: "bash -c.*\\$", description: "bash -c with variable expansion" },
-	{ pattern: "tee /", description: "write to root filesystem" },
+	{ pattern: "sudo tee /", description: "sudo write to root filesystem" },
 ];
 
 const DEFAULT_CATASTROPHIC: PatternRule[] = [
@@ -99,7 +98,7 @@ const DEFAULT_CATASTROPHIC: PatternRule[] = [
 	{ pattern: "rm -rf /", description: "recursive delete root" },
 	{ pattern: "rm -rf /*", description: "recursive delete root contents" },
 	{ pattern: "sudo mkfs", description: "sudo filesystem format" },
-	{ pattern: "mkfs", description: "filesystem format" },
+	{ pattern: "\\bmkfs\\b", description: "filesystem format" },
 	{ pattern: "dd if=", description: "raw disk read" },
 	{ pattern: "dd of=", description: "raw disk write" },
 	{ pattern: ":\\(\\){ :\\|:& };:", description: "fork bomb" },
@@ -109,12 +108,12 @@ const DEFAULT_CATASTROPHIC: PatternRule[] = [
 	{ pattern: "> /dev/nvme", description: "overwrite nvme disk" },
 	{ pattern: "> /dev/sd", description: "overwrite disk device" },
 	{ pattern: "sudo dd", description: "sudo raw disk operation" },
-	{ pattern: "shutdown", description: "system shutdown" },
-	{ pattern: "reboot", description: "system reboot" },
+	{ pattern: "\\bshutdown\\b", description: "system shutdown" },
+	{ pattern: "\\breboot\\b", description: "system reboot" },
 	{ pattern: "init 0", description: "system halt" },
 	{ pattern: "init 6", description: "system reboot via init" },
-	{ pattern: "halt", description: "system halt" },
-	{ pattern: "poweroff", description: "system power off" },
+	{ pattern: "\\bhalt\\b", description: "system halt" },
+	{ pattern: "\\bpoweroff\\b", description: "system power off" },
 	{ pattern: ">/dev/sd", description: "overwrite scsi disk device" },
 	{ pattern: "mv / /dev/null", description: "move root to null" },
 	{ pattern: "cp -r / /dev/null", description: "copy root to null" },
@@ -155,7 +154,7 @@ const DEFAULT_EXEMPT = [
 	"readlink", "column", "jq", "yq",
 ];
 
-// Shell trick patterns — always prompt (except in bypassPermissions)
+// Shell trick patterns — always prompt (except in bypassPermissions/safeMode where silently blocked)
 const SHELL_TRICK_PATTERNS: ShellTrickRule[] = [
 	{ pattern: /\$\(/, description: "command substitution $(…)" },
 	{ pattern: /`[^`]+`/, description: "backtick command substitution" },
@@ -196,7 +195,7 @@ async function loadConfig(): Promise<{
 	const catastrophic = local.catastrophicPatterns ?? global.catastrophicPatterns ?? DEFAULT_CATASTROPHIC;
 
 	return {
-		mode: local.mode ?? global.mode ?? "acceptEdits",
+		mode: local.mode ?? global.mode ?? "safeMode",
 		dangerousPatterns: compilePatterns(dangerous),
 		catastrophicPatterns: compilePatterns(catastrophic),
 		protectedPaths: local.protectedPaths ?? global.protectedPaths ?? DEFAULT_PROTECTED_PATHS,
@@ -211,7 +210,7 @@ function compilePatterns(patterns: PatternRule[]): PatternRule[] {
 			return { ...p, regex: new RegExp(p.pattern, "i") };
 		} catch {
 			console.warn(`[permission-gate] Invalid regex pattern: ${p.pattern}`);
-			return p; // Keep for substring matching fallback
+			return p;
 		}
 	});
 }
@@ -232,6 +231,12 @@ function matchesRule(command: string, rules: PatternRule[]): PatternRule | undef
 function buildExemptRegex(commands: string[]): RegExp {
 	const escaped = commands.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 	return new RegExp(`^\\s*(?:${escaped.join("|")})\\b`, "i");
+}
+
+/** Resolve and normalize a path for protected path checks */
+function resolveTargetPath(inputPath: string, cwd: string): string {
+	const expanded = inputPath.replace(/^~/, homedir());
+	return resolve(cwd, expanded);
 }
 
 // --- Approval prompt ---
@@ -301,8 +306,9 @@ export default async function (pi: ExtensionAPI) {
 	const dangerousPatterns = config.dangerousPatterns;
 	const catastrophicPatterns = config.catastrophicPatterns;
 	const home = homedir();
+	const cwd = process.cwd();
 	const resolvedProtectedPaths = config.protectedPaths.map((p) =>
-		p.startsWith("~/") ? resolve(home, p.slice(2)) : resolve(p)
+		p.startsWith("~/") ? resolve(home, p.slice(2)) : resolve(cwd, p)
 	);
 	const sessionAllow: SessionAllow = { tools: new Set(), commands: new Set() };
 	const exemptCommandRegex = buildExemptRegex(config.exemptCommands);
@@ -325,58 +331,31 @@ export default async function (pi: ExtensionAPI) {
 	pi.on("tool_call", async (event, ctx) => {
 		const toolName = event.toolName;
 
-		// --- Plan mode: allow only read + .md write/edit ---
-		if (mode === "plan") {
-			if (toolName === "read") return undefined;
-
-			if (toolName === "write" || toolName === "edit") {
-				const path = String(event.input.path ?? "");
-				if (/\.md$/i.test(path)) return undefined;
-
-				// Check protected paths even in plan mode
-				const targetPath = resolve(path);
-				const blocked = resolvedProtectedPaths.find((p) => targetPath === p || targetPath.startsWith(p + "/"));
-				if (blocked) {
-					ctx.ui.notify(`🚫 Protected path blocked: ${blocked.replace(home, "~")}`, "error");
-					return { block: true, reason: `Protected path: ${blocked}` };
-				}
-
-				ctx.ui.notify("⛔ Plan mode: only .md files allowed", "warning");
-				return { block: true, reason: "Plan mode: only .md files allowed" };
-			}
-
-			if (toolName === "bash") {
-				const command = String(event.input.command ?? "");
-
-				// Allow exempt read-only commands in plan mode
-				if (exemptCommandRegex.test(command)) return undefined;
-
-				ctx.ui.notify("⛔ Plan mode: read + markdown files only", "warning");
-				return { block: true, reason: "Plan mode: read + markdown files only" };
-			}
-
-			ctx.ui.notify("⛔ Plan mode: read + markdown files only", "warning");
-			return { block: true, reason: "Plan mode: read + markdown files only" };
-		}
-
-		// --- Non-gated tools: always allow ---
-		if (!GATED_TOOLS.has(toolName)) return undefined;
-
-		// --- Bash-specific checks (all modes except plan) ---
+		// --- Catastrophic check: always blocked in every mode ---
+		// Checked early so no mode can bypass these
 		if (toolName === "bash") {
 			const command = String(event.input.command ?? "");
-
-			// Skip exempt read-only commands
-			if (exemptCommandRegex.test(command)) return undefined;
-
-			// CATASTROPHIC CHECK — always blocked, every mode
-			const catastrophe = matchesRule(command, catastrophicPatterns);
-			if (catastrophe) {
-				ctx.ui.notify(`🚫 Catastrophic: ${catastrophe.description}`, "error");
-				return { block: true, reason: `Catastrophic: ${catastrophe.description}` };
+			if (!exemptCommandRegex.test(command)) {
+				const catastrophe = matchesRule(command, catastrophicPatterns);
+				if (catastrophe) {
+					ctx.ui.notify(`🚫 Catastrophic: ${catastrophe.description}`, "error");
+					return { block: true, reason: `Catastrophic: ${catastrophe.description}` };
+				}
 			}
+		}
 
-			// Protected path check for bash
+		// --- Protected path checks: always blocked in every mode ---
+		if (toolName === "write" || toolName === "edit") {
+			const targetPath = resolveTargetPath(String(event.input.path ?? ""), cwd);
+			const blocked = resolvedProtectedPaths.find((p) => targetPath === p || targetPath.startsWith(p + "/"));
+			if (blocked) {
+				ctx.ui.notify(`🚫 Protected path blocked: ${blocked.replace(home, "~")}`, "error");
+				return { block: true, reason: `Protected path: ${blocked}` };
+			}
+		}
+
+		if (toolName === "bash") {
+			const command = String(event.input.command ?? "");
 			const blockedPath = resolvedProtectedPaths.find((p) =>
 				command.includes(p) || command.includes(p.replace(home, "~"))
 			);
@@ -387,24 +366,43 @@ export default async function (pi: ExtensionAPI) {
 			}
 		}
 
-		// --- Write/Edit protected path checks (all modes except plan) ---
-		if (toolName === "write" || toolName === "edit") {
-			const targetPath = resolve(String(event.input.path ?? ""));
-			const blocked = resolvedProtectedPaths.find((p) => targetPath === p || targetPath.startsWith(p + "/"));
-			if (blocked) {
-				ctx.ui.notify(`🚫 Protected path blocked: ${blocked.replace(home, "~")}`, "error");
-				return { block: true, reason: `Protected path: ${blocked}` };
+		// --- Non-gated tools: always allow ---
+		if (!GATED_TOOLS.has(toolName)) return undefined;
+
+		// Read tool is never gated
+		if (toolName === "read") return undefined;
+
+		// --- Plan mode: allow only read + .md write/edit ---
+		if (mode === "plan") {
+			if (toolName === "write" || toolName === "edit") {
+				const path = String(event.input.path ?? "");
+				if (/\.md$/i.test(path)) return undefined;
+				ctx.ui.notify("⛔ Plan mode: only .md files allowed", "warning");
+				return { block: true, reason: "Plan mode: only .md files allowed" };
 			}
+
+			if (toolName === "bash") {
+				const command = String(event.input.command ?? "");
+				if (exemptCommandRegex.test(command)) return undefined;
+				ctx.ui.notify("⛔ Plan mode: read + markdown files only", "warning");
+				return { block: true, reason: "Plan mode: read + markdown files only" };
+			}
+
+			ctx.ui.notify("⛔ Plan mode: read + markdown files only", "warning");
+			return { block: true, reason: "Plan mode: read + markdown files only" };
 		}
+
+		// --- Bash shared checks ---
+		const command = toolName === "bash" ? String(event.input.command ?? "") : "";
+
+		// --- Exempt commands: skip all checks ---
+		if (toolName === "bash" && exemptCommandRegex.test(command)) return undefined;
 
 		// --- SafeMode: silently block dangerous, allow everything else ---
 		if (mode === "safeMode") {
 			if (toolName === "write" || toolName === "edit") return undefined;
 
 			if (toolName === "bash") {
-				const command = String(event.input.command ?? "");
-
-				// Shell trick check in safeMode — prompt since it could be dangerous
 				const trick = SHELL_TRICK_PATTERNS.find((p) => p.pattern.test(command));
 				if (trick) {
 					ctx.ui.notify(`⛔ Blocked shell trick: ${trick.description}`, "warning");
@@ -421,12 +419,11 @@ export default async function (pi: ExtensionAPI) {
 			return undefined;
 		}
 
-		// --- Bypass: everything allowed (catastrophic & protected paths already checked above) ---
+		// --- Bypass: everything allowed (catastrophic & protected paths already checked) ---
 		if (mode === "bypassPermissions") return undefined;
 
-		// --- Shell trick check (not in bypassPermissions) ---
-		if (toolName === "bash" && mode !== "bypassPermissions") {
-			const command = String(event.input.command ?? "");
+		// --- Shell trick check (prompt in default/acceptEdits/fullAuto) ---
+		if (toolName === "bash") {
 			const trick = SHELL_TRICK_PATTERNS.find((p) => p.pattern.test(command));
 			if (trick) {
 				if (!ctx.hasUI) {
@@ -448,14 +445,13 @@ export default async function (pi: ExtensionAPI) {
 		if (mode === "fullAuto") {
 			if (toolName === "write" || toolName === "edit") return undefined;
 			if (toolName === "bash") {
-				const command = String(event.input.command ?? "");
 				const danger = matchesRule(command, dangerousPatterns);
 				if (!danger) return undefined;
 			}
 		}
 
 		// --- Session allows ---
-		if (toolName === "bash" && sessionAllow.commands.has(String(event.input.command ?? ""))) return undefined;
+		if (toolName === "bash" && sessionAllow.commands.has(command)) return undefined;
 		if (sessionAllow.tools.has(toolName)) return undefined;
 
 		// --- Prompt for approval ---

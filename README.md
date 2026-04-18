@@ -10,11 +10,13 @@ fresh_start/
 ├── pi-extensions/         # Pi coding agent extensions
 │   ├── setup.sh
 │   └── extensions/
-│       ├── web-search.ts
+│       ├── ask-questions.ts
+│       ├── context-usage.ts
 │       ├── exit-command.ts
 │       ├── permission-gate.ts
 │       ├── permissions.json
-│       └── share-local.ts
+│       ├── share-local.ts
+│       └── web-search.ts
 └── README.md
 ```
 
@@ -51,7 +53,7 @@ fresh_start/
 | `productivity` | Productivity apps | Ghostty, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | K8s tooling | Docker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | Enhanced CLI | bat, eza, ripgrep, zellij |
-| `pi-extensions` | Pi coding agent extensions | web-search, exit-command, permission-gate, share-local |
+| `pi-extensions` | Pi coding agent extensions | see below |
 
 ## Pi Extensions
 
@@ -66,40 +68,80 @@ Or via the main script:
 
 ### Included Extensions
 
-**web-search.ts** - Web search and fetch via DuckDuckGo
-- `web_search` - Search the web using DuckDuckGo
-- `web_fetch` - Fetch content from URLs as markdown
+#### permission-gate.ts — Unified Permission Gate
 
-**exit-command.ts** - `/exit` as alias for `/quit`
+Merged from `@rhedbull/pi-permissions` with custom enhancements. Controls what the agent can execute.
 
-**permission-gate.ts** - Permission gate for dangerous commands
-- Blocks catastrophic commands (e.g., `rm -rf /`, `dd if=`, fork bombs)
-- Confirms dangerous commands before running
-- Protects sensitive paths from write/edit operations
-- Supports three modes: `acceptEdits`, `confirmAll`, `blockAll`
+**6 Modes:**
 
-**permissions.json** - Configuration for permission-gate.ts
+| Mode | Write/Edit | Bash (safe) | Bash (dangerous) | Catastrophic |
+|------|-----------|-------------|-------------------|--------------|
+| `default` | ❓ Confirm | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
+| `acceptEdits` | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
+| `fullAuto` | ✅ Auto | ✅ Auto | ❓ Confirm | 🚫 Blocked |
+| `safeMode` | ✅ Auto | ✅ Auto | ⛔ Silently blocked | 🚫 Blocked |
+| `bypassPermissions` | ✅ Auto | ✅ Auto | ✅ Auto | 🚫 Blocked |
+| `plan` | ✅ .md only | ✅ Read only | ⛔ Blocked | 🚫 Blocked |
 
-**share-local.ts** - Export session to HTML and open locally
-- `/share-local` - Export and open in Chrome
-- `/share-local --path` - Show path only
-- `/share-local --copy` - Copy path to clipboard
+**Commands:**
 
-### Permission Modes
+| Command | Description |
+|---------|-------------|
+| `/permissions` | Interactive mode selector |
+| `/permissions <mode>` | Set mode directly (e.g., `/permissions safeMode`) |
+| `/permissions-settings` | Show all settings (patterns, paths, commands) |
+| `/permissions:status` | Show current mode + session allows |
+| `Ctrl+Shift+P` | Cycle through modes |
 
-Configurable via `permissions.json`:
+**Features:**
+- 22 dangerous patterns (`rm -rf`, `git push -f`, `kill -9`, etc.)
+- 27 catastrophic patterns (always blocked in every mode)
+- 21 protected paths (`~/.ssh`, `~/.aws`, `~/.kube/config`, etc.)
+- 44 exempt commands (grep, find, cat, etc. skip all checks)
+- 10 shell trick patterns (`$()` command substitution, `eval`, pipe-to-shell, etc.)
+- Session approval ("Allow once" or "Allow for session")
+- Status bar widget showing current mode
 
-| Mode | Write | Normal Bash | Dangerous Bash | Catastrophic |
-|------|-------|-------------|----------------|--------------|
-| `acceptEdits` (default) | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
-| `confirmAll` | ✅ Auto | ❓ Confirm | ❓ Confirm | 🚫 Blocked |
-| `blockAll` | 🚫 Blocked | 🚫 Blocked | 🚫 Blocked | 🚫 Blocked |
+#### ask-questions.ts — Interactive Multi-Question Tool
 
-**Dangerous patterns** (require confirmation): `rm -rf`, `chmod -R 777`, `chown -R`, device writes
+Agent asks multiple questions with options, recommended answers, and custom input.
 
-**Catastrophic patterns** (always blocked): `rm -rf /`, `sudo mkfs`, `dd if=`, fork bombs, disk overwrites
+**Features:**
+- multiple questions with sequential navigation
+- ★ recommended answer indicator
+- "Type something..." for custom answers
+- "Skip this question" option
+- ← → arrow keys to navigate between questions
+- Cancel (Esc) returns partial answers
 
-**Protected paths** (write/edit blocked): `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube/config`, `~/.pi/agent/auth.json`
+#### context-usage.ts — Context Usage Status Bar
+
+Shows context window usage in the footer status bar.
+
+- `ctx: 12% (24K/200K)` when under 50%
+- `⚠ ctx: 58% (116K/200K)` when over 50%
+- Updates on message, turn, model change, and session start
+
+#### web-search.ts — Web Search & Fetch
+- `web_search` — Search the web using DuckDuckGo
+- `web_fetch` — Fetch content from URLs as markdown
+
+#### exit-command.ts — `/exit` as alias for `/quit`
+
+#### share-local.ts — Export Session to HTML
+- `/share-local` — Export and open in Chrome
+- `/share-local --path` — Show path only
+- `/share-local --copy` — Copy path to clipboard
+
+### Permission Patterns
+
+**Catastrophic patterns** (always blocked): `rm -rf /`, `sudo mkfs`, `dd if=`, fork bombs, `\bshutdown\b`, `\bhalt\b`, `\bpoweroff\b`, disk overwrites
+
+**Dangerous patterns** (blocked/prompted depending on mode): `rm -rf`, `chmod -R 777`, pipe-to-shell, `git push -f`, `kill -9`, `sudo tee /`, `eval(...)`, `bash -c $`
+
+**Exempt commands** (skip all checks): `grep`, `rg`, `find`, `cat`, `head`, `tail`, `ls`, `pwd`, `echo`, `diff`, `jq`, `yq`, and 30+ more
+
+**Protected paths** (write/edit always blocked): `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube/config`, `~/.pi/agent/auth.json`, and 16 more
 
 ## After Setup
 

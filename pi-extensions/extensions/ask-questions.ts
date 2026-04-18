@@ -59,7 +59,7 @@ export default function askQuestions(pi: ExtensionAPI) {
 				};
 			}
 
-			// Collected answers
+			// Collected answers (null = not answered yet)
 			const answers: (QAnswer | null)[] = params.questions.map(() => null);
 
 			const result = await ctx.ui.custom<QAnswer[] | null>((tui, theme, _kb, done) => {
@@ -83,9 +83,10 @@ export default function askQuestions(pi: ExtensionAPI) {
 
 				function buildOptions(qIdx: number): QOption[] {
 					const q = params.questions[qIdx];
+					const recommendedIndex = q.recommendedIndex !== undefined ? Math.min(q.recommendedIndex, q.options.length - 1) : undefined;
 					return q.options.map((o, i) => ({
 						...o,
-						isRecommended: q.recommendedIndex !== undefined && i === q.recommendedIndex,
+						isRecommended: recommendedIndex !== undefined && i === recommendedIndex,
 					}));
 				}
 
@@ -149,7 +150,8 @@ export default function askQuestions(pi: ExtensionAPI) {
 
 					add(theme.bold("Q") + theme.fg("text", ` ${q.question}`));
 					if (q.recommendedIndex !== undefined) {
-						const rec = opts[q.recommendedIndex];
+						const recommendedIndex = Math.min(q.recommendedIndex, opts.length - 1);
+						const rec = opts[recommendedIndex];
 						if (rec) {
 							add(theme.fg("dim", `  Agent recommends: ${theme.fg("accent", rec.label)}`));
 						}
@@ -164,28 +166,36 @@ export default function askQuestions(pi: ExtensionAPI) {
 						if (opt.isRecommended && selected) {
 							add(theme.fg("accent", "▸ ★ ") + theme.fg("accent", opt.label));
 						} else if (opt.isRecommended) {
-							add(`  ★ ` + theme.fg("success", opt.label));
+							add("  ★ " + theme.fg("success", opt.label));
 						} else if (selected) {
 							add(theme.fg("accent", "▸ ") + theme.fg("accent", opt.label));
 						} else {
-							add(`  ${theme.fg("text", opt.label)}`);
+							add("  " + theme.fg("text", opt.label));
 						}
 
 						if (opt.description) {
-							add(`     ${theme.fg("muted", opt.description)}`);
+							add("     " + theme.fg("muted", opt.description));
 						}
 					}
 
-					// "Type something..." option
+					// "Type something..." and "Skip" options
 					const otherIdx = opts.length;
+					const skipIdx = opts.length + 1;
 					const isOther = optionCursor === otherIdx;
+					const isSkip = optionCursor === skipIdx;
 
 					if (isOther && editMode) {
 						add(theme.fg("accent", "▸ ✎ Type something..."));
 					} else if (isOther) {
 						add(theme.fg("accent", "▸ Type something..."));
 					} else {
-						add(`  ${theme.fg("dim", `Type something...`)}`);
+						add("  " + theme.fg("dim", "Type something..."));
+					}
+
+					if (isSkip) {
+						add(theme.fg("dim", "▸ Skip this question"));
+					} else {
+						add("  " + theme.fg("dim", "Skip this question"));
 					}
 
 					// Editor for custom input
@@ -193,7 +203,7 @@ export default function askQuestions(pi: ExtensionAPI) {
 						lines.push("");
 						add(theme.fg("muted", " Your answer:"));
 						for (const line of editor.render(width - 2)) {
-							add(` ${line}`);
+							add(" " + line);
 						}
 					}
 
@@ -203,7 +213,11 @@ export default function askQuestions(pi: ExtensionAPI) {
 					if (editMode) {
 						add(theme.fg("dim", " Enter to submit • Esc to go back"));
 					} else {
-						add(theme.fg("dim", " ↑↓ navigate • Enter to select • Esc to cancel"));
+						const nav = [];
+						if (activeQuestion > 0) nav.push("← prev");
+						if (activeQuestion < params.questions.length - 1) nav.push("→ next");
+						nav.push("↑↓ navigate", "Enter select", "Esc cancel");
+						add(theme.fg("dim", nav.join(" • ")));
 					}
 					add(theme.fg("accent", "─".repeat(width)));
 
@@ -225,7 +239,7 @@ export default function askQuestions(pi: ExtensionAPI) {
 					}
 
 					const opts = buildOptions(activeQuestion);
-					const maxCursor = opts.length; // +1 for "type something"
+					const maxCursor = opts.length + 1; // +1 for "type something", +1 for "skip"
 
 					if (matchesKey(data, Key.up)) {
 						optionCursor = Math.max(0, optionCursor - 1);
@@ -238,15 +252,51 @@ export default function askQuestions(pi: ExtensionAPI) {
 						return;
 					}
 
+					// Go to previous question
+					if (matchesKey(data, Key.left) && activeQuestion > 0) {
+						activeQuestion--;
+						optionCursor = 0;
+						editMode = false;
+						editor.setText("");
+						refresh();
+						return;
+					}
+					// Go to next question
+					if (matchesKey(data, Key.right) && activeQuestion < params.questions.length - 1) {
+						activeQuestion++;
+						optionCursor = 0;
+						editMode = false;
+						editor.setText("");
+						refresh();
+						return;
+					}
+
 					if (matchesKey(data, Key.enter)) {
 						if (optionCursor < opts.length) {
 							// Selected predefined option
 							selectOption(opts[optionCursor].label, false);
-						} else {
+						} else if (optionCursor === opts.length) {
 							// "Type something..."
 							editMode = true;
 							editor.setText("");
 							refresh();
+						} else {
+							// "Skip this question"
+							answers[activeQuestion] = { question: params.questions[activeQuestion].question, answer: null, wasCustom: false };
+							// Move to next unanswered question
+							let next = activeQuestion + 1;
+							while (next < params.questions.length && answers[next] !== null) {
+								next++;
+							}
+							if (next < params.questions.length) {
+								activeQuestion = next;
+								optionCursor = 0;
+								editMode = false;
+								editor.setText("");
+								refresh();
+							} else {
+								done(answers.filter((a): a is QAnswer => a !== null));
+							}
 						}
 						return;
 					}
@@ -260,15 +310,17 @@ export default function askQuestions(pi: ExtensionAPI) {
 			});
 
 			if (!result) {
+				// User cancelled - return partial answers
+				const partialAnswers = answers.filter((a): a is QAnswer => a !== null);
 				return {
-					content: [{ type: "text", text: "User cancelled" }],
-					details: { answers: answers.filter((a): a is QAnswer => a !== null) },
+					content: [{ type: "text", text: partialAnswers.length > 0 ? "User cancelled (partial answers collected)" : "User cancelled" }],
+					details: { answers: partialAnswers },
 				};
 			}
 
 			// Build response
 			const lines = result.map((a) =>
-				`Q: ${a.question}\nA: ${a.answer}${a.wasCustom ? " (custom)" : ""}`
+				a.answer ? `Q: ${a.question}\nA: ${a.answer}${a.wasCustom ? " (custom)" : ""}` : `Q: ${a.question}\nA: (skipped)`
 			);
 
 			return {
@@ -280,12 +332,13 @@ export default function askQuestions(pi: ExtensionAPI) {
 		renderCall(args, theme, _context) {
 			const questions = Array.isArray(args.questions) ? args.questions : [];
 			const summary = questions.map((q: any, i: number) => {
-				const rec = q.recommendedIndex !== undefined && q.options?.[q.recommendedIndex] ? ` ★${q.options[q.recommendedIndex].label}` : "";
+				const recommendedIndex = q.recommendedIndex !== undefined ? Math.min(q.recommendedIndex, (q.options?.length ?? 1) - 1) : undefined;
+				const rec = recommendedIndex !== undefined && q.options?.[recommendedIndex] ? ` ★${q.options[recommendedIndex].label}` : "";
 				return `${i + 1}. ${q.question}${rec}`;
 			});
 			let text = theme.fg("toolTitle", theme.bold("ask_questions ")) + theme.fg("muted", `(${questions.length} question${questions.length > 1 ? "s" : ""})`);
 			for (const s of summary) {
-				text += `\n${theme.fg("dim", "  " + s)}`;
+				text += "\n" + theme.fg("dim", "  " + s);
 			}
 			return new Text(text, 0, 0);
 		},
@@ -297,6 +350,7 @@ export default function askQuestions(pi: ExtensionAPI) {
 			}
 
 			const lines = details.answers.map((a) => {
+				if (!a.answer) return theme.fg("dim", "⊘ " + a.question);
 				const icon = a.wasCustom ? "✎" : "✓";
 				const color = a.wasCustom ? "warning" : "success";
 				return `${theme.fg(color, icon)} ${a.answer}`;

@@ -2,7 +2,7 @@
  * Context Usage Status Bar Extension
  *
  * Shows the current context usage percentage in the footer status bar.
- * Highlights in red when context passes 50%.
+ * Indicates with ⚠ when context passes 50%.
  *
  * Updates after each message, turn, model change, and session start.
  */
@@ -12,16 +12,15 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 const STATUS_ID = "ctx";
 
 export default function (pi: ExtensionAPI) {
-	async function updateStatusBar(ctx: any) {
+	async function updateStatusBar(ctx: { getContextUsage: () => any; model: any; ui: { setStatus: (id: string, text: string | undefined) => void } }) {
 		const usage = ctx.getContextUsage();
-		if (!usage) {
+		if (!usage || usage.tokens === undefined) {
 			ctx.ui.setStatus(STATUS_ID, "ctx: N/A");
 			return;
 		}
 
-		const used = usage.tokens ?? 0;
-		const model = ctx.model;
-		const max = model?.contextWindow ?? 200_000;
+		const used = usage.tokens;
+		const max = ctx.model?.contextWindow ?? 200_000;
 		const percent = Math.round((used / max) * 100);
 		const indicator = percent > 50 ? "⚠" : "";
 		const formatted = `${indicator} ctx: ${percent}% (${fmt(used)}/${fmt(max)})`;
