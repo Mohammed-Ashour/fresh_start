@@ -12,9 +12,9 @@
  *   - plan:              Read + markdown files only
  *
  * Commands:
- *   /permission           - Show current settings
- *   /permissions          - Interactive mode selector
+ *   /permissions          - Show or change permission mode
  *   /permissions <mode>   - Set mode directly
+ *   /permissions-settings - Show current settings
  *   /permissions:status   - Show current mode
  *
  * Keyboard shortcut: Ctrl+Shift+P - Cycle through modes
@@ -464,7 +464,7 @@ export default async function (pi: ExtensionAPI) {
 
 	// --- Commands ---
 
-	pi.registerCommand("permission", {
+	pi.registerCommand("permissions-settings", {
 		description: "Show permission gate settings",
 		handler: async (_args, ctx) => {
 			const currentMode = MODES.find((m) => m.id === mode)!;
