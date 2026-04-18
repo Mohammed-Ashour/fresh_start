@@ -2,39 +2,33 @@
  * Context Usage Status Bar Extension
  *
  * Shows the current context usage percentage in the footer status bar.
- * Turns red when context passes 50%.
+ * Highlights in red when context passes 50%.
  *
- * Updates after each message and turn.
+ * Updates after each message, turn, model change, and session start.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-const STATUS_ID = "context-usage";
+const STATUS_ID = "ctx";
 
 export default function (pi: ExtensionAPI) {
-	async function updateStatusBar(ctx: { getContextUsage: () => any; ui: { setStatus: (id: string, text: string | undefined) => void } }) {
+	async function updateStatusBar(ctx: any) {
 		const usage = ctx.getContextUsage();
 		if (!usage) {
-			ctx.ui.setStatus(STATUS_ID, "⏳ context: N/A");
+			ctx.ui.setStatus(STATUS_ID, "ctx: N/A");
 			return;
 		}
 
 		const used = usage.tokens ?? 0;
-		const model = (ctx as any).model;
+		const model = ctx.model;
 		const max = model?.contextWindow ?? 200_000;
 		const percent = Math.round((used / max) * 100);
+		const formatted = `ctx: ${percent}% (${fmt(used)}/${fmt(max)})`;
 
-		let text: string;
-		if (percent > 50) {
-			text = `🔴 ctx ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
-		} else {
-			text = `🟢 ctx ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
-		}
-
-		ctx.ui.setStatus(STATUS_ID, text);
+		ctx.ui.setStatus(STATUS_ID, formatted);
 	}
 
-	function formatTokens(n: number): string {
+	function fmt(n: number): string {
 		if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
 		if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
 		return `${n}`;
