@@ -25,12 +25,8 @@ export default function (pi: ExtensionAPI) {
 		const percent = Math.round((used / max) * 100);
 
 		let text: string;
-		if (percent > 90) {
-			text = `🔴 CONTEX ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
-		} else if (percent > 75) {
-			text = `🟠 contxt ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
-		} else if (percent > 50) {
-			text = `🟡 ctx ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
+		if (percent > 50) {
+			text = `🔴 ctx ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
 		} else {
 			text = `🟢 ctx ${percent}% (${formatTokens(used)}/${formatTokens(max)})`;
 		}
