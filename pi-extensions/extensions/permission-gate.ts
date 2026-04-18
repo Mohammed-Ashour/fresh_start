@@ -55,13 +55,13 @@ interface PermissionsConfig {
 
 // --- Constants ---
 
-const MODES: { id: PermissionMode; label: string; description: string; icon: string }[] = [
-	{ id: "default", label: "Default", description: "Confirm every write, edit, and bash command", icon: "⏵" },
-	{ id: "acceptEdits", label: "Accept Edits", description: "Allow write/edit silently, confirm bash", icon: "⏵⏵" },
-	{ id: "fullAuto", label: "Full Auto", description: "Allow write/edit/bash, confirm dangerous only", icon: "⏵⏵⏵" },
-	{ id: "safeMode", label: "Safe Mode", description: "Allow everything, silently block dangerous commands", icon: "🛡" },
-	{ id: "bypassPermissions", label: "Bypass Permissions", description: "Allow everything, block catastrophic only", icon: "⏵⏵⏵⏵" },
-	{ id: "plan", label: "Plan Mode", description: "Read + markdown files only", icon: "📝" },
+const MODES: { id: PermissionMode; label: string; description: string }[] = [
+	{ id: "default", label: "Default", description: "Confirm every write, edit, and bash command" },
+	{ id: "acceptEdits", label: "Accept Edits", description: "Allow write/edit silently, confirm bash" },
+	{ id: "fullAuto", label: "Full Auto", description: "Allow write/edit/bash, confirm dangerous only" },
+	{ id: "safeMode", label: "Safe Mode", description: "Allow everything, silently block dangerous commands" },
+	{ id: "bypassPermissions", label: "Bypass Permissions", description: "Allow everything, block catastrophic only" },
+	{ id: "plan", label: "Plan Mode", description: "Read + markdown files only" },
 ];
 
 const GATED_TOOLS = new Set(["write", "edit", "bash"]);
@@ -317,7 +317,7 @@ export default async function (pi: ExtensionAPI) {
 
 	function updateStatus(ctx: { ui: { setStatus: (id: string, text: string | undefined) => void } }) {
 		const m = MODES.find((m) => m.id === mode)!;
-		ctx.ui.setStatus("permissions", `${m.icon} ${m.label}`);
+		ctx.ui.setStatus("permissions", m.label);
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
@@ -496,13 +496,13 @@ export default async function (pi: ExtensionAPI) {
 				sessionAllow.tools.clear();
 				sessionAllow.commands.clear();
 				updateStatus(ctx);
-				ctx.ui.notify(`Mode: ${found.icon} ${found.label}`, "info");
+				ctx.ui.notify(`Mode: ${found.label}`, "info");
 				return;
 			}
 
 			const choices = MODES.map((m) => {
 				const current = m.id === mode ? " (current)" : "";
-				return `${m.icon} ${m.label}${current}`;
+				return `${m.label}${current}`;
 			});
 
 			const choice = await ctx.ui.select("Permission Mode", choices);
@@ -514,7 +514,7 @@ export default async function (pi: ExtensionAPI) {
 				sessionAllow.tools.clear();
 				sessionAllow.commands.clear();
 				updateStatus(ctx);
-				ctx.ui.notify(`Mode: ${MODES[idx]!.icon} ${MODES[idx]!.label}`, "info");
+				ctx.ui.notify(`Mode: ${MODES[idx]!.label}`, "info");
 			}
 		},
 	});
@@ -523,7 +523,7 @@ export default async function (pi: ExtensionAPI) {
 		description: "Show current permission mode",
 		handler: async (_args, ctx) => {
 			const m = MODES.find((m) => m.id === mode)!;
-			let status = `${m.icon} ${m.label} (${m.id})\n${m.description}`;
+			let status = `${m.label} (${m.id})\n${m.description}`;
 			if (sessionAllow.tools.size > 0) status += `\nSession tools: ${[...sessionAllow.tools].join(", ")}`;
 			if (sessionAllow.commands.size > 0) status += `\nSession commands: ${sessionAllow.commands.size}`;
 			ctx.ui.notify(status, "info");
@@ -539,7 +539,7 @@ export default async function (pi: ExtensionAPI) {
 			sessionAllow.tools.clear();
 			sessionAllow.commands.clear();
 			updateStatus(ctx);
-			ctx.ui.notify(`Mode: ${MODES.find((m) => m.id === mode)!.icon} ${MODES.find((m) => m.id === mode)!.label}`, "info");
+			ctx.ui.notify(`Mode: ${MODES.find((m) => m.id === mode)!.label}`, "info");
 		},
 	});
 }
