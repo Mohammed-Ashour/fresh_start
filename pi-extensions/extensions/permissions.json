@@ -1,12 +1,5 @@
 {
-  "mode": "acceptEdits",
-  "modeDescriptions": {
-    "acceptEdits": "Allow write/edit silently, confirm bash",
-    "fullAuto": "Allow write/edit/bash, confirm dangerous only",
-    "safeMode": "Allow everything, silently block dangerous commands",
-    "bypassPermissions": "Allow everything, block catastrophic only",
-    "plan": "Read + markdown files only"
-  },
+  "mode": "safeMode",
   "dangerousPatterns": [
     { "pattern": "rm -rf", "description": "recursive force delete" },
     { "pattern": "chmod -R 777", "description": "insecure recursive permissions" },
@@ -29,8 +22,6 @@
     { "pattern": "chmod -R 777 /", "description": "recursive open permissions on root" },
     { "pattern": "eval.*\\$\\(", "description": "eval with command substitution" },
     { "pattern": "bash -c.*\\$", "description": "bash -c with variable expansion" },
-    { "pattern": "source /dev/", "description": "source from device file" },
-    { "pattern": "cat /dev/", "description": "read from device file" },
     { "pattern": "tee /", "description": "write to root filesystem" }
   ],
   "catastrophicPatterns": [
@@ -82,8 +73,7 @@
     "~/.ssh/id_ed25519",
     "~/.ssh/known_hosts",
     "~/.aws/credentials",
-    "~/.config/gcloud",
-    "~/.kube/config"
+    "~/.config/gcloud"
   ],
   "exemptCommands": [
     "grep",
