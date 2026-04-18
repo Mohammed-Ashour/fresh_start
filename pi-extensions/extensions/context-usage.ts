@@ -23,7 +23,8 @@ export default function (pi: ExtensionAPI) {
 		const model = ctx.model;
 		const max = model?.contextWindow ?? 200_000;
 		const percent = Math.round((used / max) * 100);
-		const formatted = `ctx: ${percent}% (${fmt(used)}/${fmt(max)})`;
+		const indicator = percent > 50 ? "⚠" : "";
+		const formatted = `${indicator} ctx: ${percent}% (${fmt(used)}/${fmt(max)})`;
 
 		ctx.ui.setStatus(STATUS_ID, formatted);
 	}
