@@ -7,7 +7,7 @@
 # Interactive macOS development environment setup with modular components.
 #
 # Usage:
-#   ./init_macos.sh                    # Interactive mode (menu)
+#   ./init_macos.sh                    # Interactive mode (menu + prompts)
 #   ./init_macos.sh --all              # Install everything
 #   ./init_macos.sh --category <name>  # Install specific category
 #   ./init_macos.sh --dry-run          # Show what would be done
@@ -80,11 +80,11 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Categories:"
             echo "  core           - Homebrew, Zsh, Oh My Zsh, Git"
-            echo "  dev-tools      - VS Code, lazygit, fzf, tmux"
+            echo "  dev-tools      - VS Code, Zed, lazygit, fzf, tmux"
             echo "  productivity   - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
             echo "  kubernetes     - Docker, kubectl, Helm, Minikube, K9s"
             echo "  cli-tools      - bat, eza, ripgrep, zellij, lazydocker"
-            echo "  pi-extensions  - Pi extensions (web-search, exit, permissions)"
+            echo "  pi-extensions  - Pi extensions + LazyPi web access"
             exit 0
             ;;
         *)
@@ -93,6 +93,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+INTERACTIVE_MODE=false
+if [[ -z "$CATEGORY" && "$INSTALL_ALL" == "false" && -t 0 && -t 1 ]]; then
+    INTERACTIVE_MODE=true
+fi
 
 # Function to detect the macOS architecture
 get_macos_arch() {
@@ -112,6 +117,7 @@ is_installed() {
 # Function to check if cask is installed
 is_cask_installed() {
     local name="$1"
+    command -v brew &>/dev/null || return 1
     brew list --cask "$name" &>/dev/null
 }
 
@@ -131,6 +137,14 @@ mark_already() {
     fi
 }
 
+# Function to add to skipped list
+mark_skipped() {
+    local package="$1"
+    if [[ ! " ${SKIPPED_PACKAGES[*]} " =~ " ${package} " ]]; then
+        SKIPPED_PACKAGES+=("$package")
+    fi
+}
+
 # Function to announce step
 announce() {
     local title="$1"
@@ -138,63 +152,326 @@ announce() {
     echo -e "${CYAN}══ $title ══${NC}"
 }
 
+# Function to run commands or print them in dry-run mode
+run_cmd() {
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf "Would run:"
+        printf " %q" "$@"
+        printf "\n"
+    else
+        "$@"
+    fi
+}
+
+# Function to append a line to a file if it is missing
+append_line_if_missing() {
+    local line="$1"
+    local file="$2"
+
+    if [[ -f "$file" ]] && grep -Fqx "$line" "$file"; then
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "Would append to $file: $line"
+    else
+        mkdir -p "$(dirname "$file")"
+        touch "$file"
+        printf '%s\n' "$line" >> "$file"
+    fi
+}
+
+# Function to resolve the Homebrew binary path
+get_homebrew_bin() {
+    if [[ -x "/opt/homebrew/bin/brew" ]]; then
+        echo "/opt/homebrew/bin/brew"
+    elif [[ -x "/usr/local/bin/brew" ]]; then
+        echo "/usr/local/bin/brew"
+    elif [[ "$(get_macos_arch)" == "arm64" ]]; then
+        echo "/opt/homebrew/bin/brew"
+    else
+        echo "/usr/local/bin/brew"
+    fi
+}
+
+# Function to resolve the Homebrew prefix
+get_homebrew_prefix() {
+    dirname "$(dirname "$(get_homebrew_bin)")"
+}
+
+# Function to ask for confirmation in interactive mode
+prompt_yes_no() {
+    local prompt="$1"
+    local default_answer="${2:-Y}"
+    local prompt_suffix
+    local reply
+    local normalized
+
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        return 0
+    fi
+
+    if [[ "$default_answer" == "Y" ]]; then
+        prompt_suffix="[Y/n]"
+    else
+        prompt_suffix="[y/N]"
+    fi
+
+    while true; do
+        echo -n "$prompt $prompt_suffix "
+        if ! read -r reply; then
+            return 1
+        fi
+
+        normalized=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
+        case "$normalized" in
+            "")
+                [[ "$default_answer" == "Y" ]] && return 0 || return 1
+                ;;
+            y|yes)
+                return 0
+                ;;
+            n|no)
+                return 1
+                ;;
+            *)
+                echo "Please answer yes or no."
+                ;;
+        esac
+    done
+}
+
+confirm_action() {
+    local prompt="$1"
+    local default_answer="${2:-Y}"
+
+    if prompt_yes_no "$prompt" "$default_answer"; then
+        return 0
+    fi
+
+    return 1
+}
+
+ensure_homebrew_available() {
+    local label="${1:-this step}"
+
+    if command -v brew &>/dev/null; then
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}⚠ Homebrew is required for $label. Install the 'core' category first.${NC}"
+    return 1
+}
+
+install_formula_if_missing() {
+    local label="$1"
+    local check_cmd="$2"
+    shift 2
+
+    if command -v "$check_cmd" &>/dev/null; then
+        mark_already "$label"
+        return 0
+    fi
+
+    if ! confirm_action "Install $label?" "Y"; then
+        echo "Skipping $label"
+        mark_skipped "$label"
+        return 0
+    fi
+
+    if ! ensure_homebrew_available "$label"; then
+        mark_skipped "$label"
+        return 0
+    fi
+
+    run_cmd "$@"
+    mark_installed "$label"
+}
+
+install_cask_if_missing() {
+    local label="$1"
+    local cask_name="$2"
+
+    if is_cask_installed "$cask_name"; then
+        mark_already "$label"
+        return 0
+    fi
+
+    if ! confirm_action "Install $label?" "Y"; then
+        echo "Skipping $label"
+        mark_skipped "$label"
+        return 0
+    fi
+
+    if ! ensure_homebrew_available "$label"; then
+        mark_skipped "$label"
+        return 0
+    fi
+
+    run_cmd brew install --cask "$cask_name"
+    mark_installed "$label"
+}
+
+run_category_selection() {
+    case "$1" in
+        1|core)
+            setup_core
+            ;;
+        2|dev-tools|devtools)
+            setup_dev_tools
+            ;;
+        3|productivity)
+            setup_productivity
+            ;;
+        4|kubernetes|k8s)
+            setup_kubernetes
+            ;;
+        5|cli-tools|clitools)
+            setup_cli_tools
+            ;;
+        6|pi-extensions|piextensions)
+            setup_pi_extensions
+            ;;
+        all)
+            setup_core
+            setup_dev_tools
+            setup_productivity
+            setup_kubernetes
+            setup_cli_tools
+            setup_pi_extensions
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # ───────────────────────────────────────────────────────────────────────────
 # CORE SETUP
 # ───────────────────────────────────────────────────────────────────────────
 setup_core() {
     announce "Core Setup"
-    
+
+    local ARCH
+    local brew_bin
+    local shellenv_line
+    local brew_ready=false
+
     ARCH=$(get_macos_arch)
     echo "Detected macOS architecture: $ARCH"
-    
+
     # Install Homebrew
     if ! command -v brew &> /dev/null; then
-        echo "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-        mark_installed "Homebrew"
+        if confirm_action "Install Homebrew?" "Y"; then
+            echo "Installing Homebrew..."
+            if [[ "$DRY_RUN" == "true" ]]; then
+                echo 'Would run: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+            else
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
+            brew_bin="$(get_homebrew_bin)"
+            shellenv_line="eval \"\$($brew_bin shellenv)\""
+            append_line_if_missing "$shellenv_line" "$HOME/.zprofile"
+            if [[ "$DRY_RUN" == "true" ]]; then
+                echo "Would run: eval \"\$($brew_bin shellenv)\""
+            else
+                eval "$($brew_bin shellenv)"
+            fi
+            mark_installed "Homebrew"
+            brew_ready=true
+        else
+            echo "Skipping Homebrew"
+            mark_skipped "Homebrew"
+        fi
     else
         mark_already "Homebrew"
+        brew_ready=true
     fi
-    
+
     # Update Homebrew
-    echo "Updating Homebrew..."
-    brew update
-    
+    if command -v brew &>/dev/null || [[ "$brew_ready" == "true" ]]; then
+        if confirm_action "Update Homebrew package metadata?" "Y"; then
+            echo "Updating Homebrew..."
+            run_cmd brew update
+            mark_installed "Homebrew update"
+        else
+            echo "Skipping Homebrew update"
+            mark_skipped "Homebrew update"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Skipping Homebrew update because Homebrew is not installed.${NC}"
+        mark_skipped "Homebrew update"
+    fi
+
     # Install Zsh
     if ! command -v zsh &> /dev/null; then
-        echo "Installing Zsh..."
-        brew install zsh
-        mark_installed "Zsh"
+        if confirm_action "Install Zsh?" "Y"; then
+            echo "Installing Zsh..."
+            if ensure_homebrew_available "Zsh"; then
+                run_cmd brew install zsh
+                mark_installed "Zsh"
+            else
+                mark_skipped "Zsh"
+            fi
+        else
+            echo "Skipping Zsh"
+            mark_skipped "Zsh"
+        fi
     else
         mark_already "Zsh"
     fi
-    
+
     # Set Zsh as default shell if not already
     if [[ "$SHELL" != "/bin/zsh" ]]; then
-        echo "Setting Zsh as default shell..."
-        chsh -s /bin/zsh
-        echo "Note: Zsh has been set as your default shell. Please restart your terminal."
-        mark_installed "Zsh (default shell)"
+        if confirm_action "Set Zsh as your default shell?" "Y"; then
+            echo "Setting Zsh as default shell..."
+            run_cmd chsh -s /bin/zsh
+            echo "Note: Zsh has been set as your default shell. Please restart your terminal."
+            mark_installed "Zsh (default shell)"
+        else
+            echo "Skipping default shell change"
+            mark_skipped "Zsh (default shell)"
+        fi
     else
         mark_already "Zsh (default shell)"
     fi
-    
+
     # Install Oh My Zsh
-    if [ ! -d "$HOME/.oh-my-zsh" ]; then
-        echo "Installing Oh My Zsh..."
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-        mark_installed "Oh My Zsh"
+    if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+        if confirm_action "Install Oh My Zsh?" "Y"; then
+            echo "Installing Oh My Zsh..."
+            if [[ "$DRY_RUN" == "true" ]]; then
+                echo 'Would run: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
+            else
+                sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+            fi
+            mark_installed "Oh My Zsh"
+        else
+            echo "Skipping Oh My Zsh"
+            mark_skipped "Oh My Zsh"
+        fi
     else
         mark_already "Oh My Zsh"
     fi
-    
+
     # Install Git
     if ! command -v git &> /dev/null; then
-        echo "Installing Git..."
-        brew install git
-        mark_installed "Git"
+        if confirm_action "Install Git?" "Y"; then
+            echo "Installing Git..."
+            if ensure_homebrew_available "Git"; then
+                run_cmd brew install git
+                mark_installed "Git"
+            else
+                mark_skipped "Git"
+            fi
+        else
+            echo "Skipping Git"
+            mark_skipped "Git"
+        fi
     else
         mark_already "Git"
     fi
@@ -205,39 +482,53 @@ setup_core() {
 # ───────────────────────────────────────────────────────────────────────────
 setup_dev_tools() {
     announce "Development Tools"
-    
-    # Install lazygit
-    if ! command -v lazygit &> /dev/null; then
-        brew install lazygit
-        mark_installed "lazygit"
-    else
-        mark_already "lazygit"
-    fi
-    
-    # Install fzf
+
+    install_formula_if_missing "lazygit" "lazygit" brew install lazygit
+
     if ! command -v fzf &> /dev/null; then
-        echo "Installing fzf..."
-        brew install fzf
-        "$(brew --prefix)/opt/fzf/install" --all --no-bash --no-fish
-        mark_installed "fzf"
+        if confirm_action "Install fzf?" "Y"; then
+            echo "Installing fzf..."
+            if ensure_homebrew_available "fzf"; then
+                run_cmd brew install fzf
+                run_cmd "$(get_homebrew_prefix)/opt/fzf/install" --all --no-bash --no-fish
+                mark_installed "fzf"
+            else
+                mark_skipped "fzf"
+            fi
+        else
+            echo "Skipping fzf"
+            mark_skipped "fzf"
+        fi
     else
         mark_already "fzf"
     fi
-    
-    # Install tmux
-    if ! command -v tmux &> /dev/null; then
-        brew install tmux
-        mark_installed "tmux"
+
+    install_formula_if_missing "tmux" "tmux" brew install tmux
+    install_cask_if_missing "VS Code" "visual-studio-code"
+
+    install_cask_if_missing "Zed" "zed"
+
+    # Configure Zed
+    ZED_CONFIG_DIR="$HOME/.config/zed"
+    ZED_CONFIG_FILE="$ZED_CONFIG_DIR/settings.json"
+    ZED_CONFIG_SRC="$(dirname "$0")/configs/zed/settings.json"
+
+    if [[ -f "$ZED_CONFIG_FILE" ]]; then
+        mark_already "Zed config"
     else
-        mark_already "tmux"
-    fi
-    
-    # Install VS Code
-    if ! is_cask_installed "visual-studio-code"; then
-        brew install --cask visual-studio-code
-        mark_installed "VS Code"
-    else
-        mark_already "VS Code"
+        if confirm_action "Configure Zed settings?" "Y"; then
+            echo "Setting up Zed configuration..."
+            if [[ "$DRY_RUN" == "true" ]]; then
+                echo "Would copy $ZED_CONFIG_SRC to $ZED_CONFIG_FILE"
+            else
+                mkdir -p "$ZED_CONFIG_DIR"
+                cp "$ZED_CONFIG_SRC" "$ZED_CONFIG_FILE"
+            fi
+            mark_installed "Zed config"
+        else
+            echo "Skipping Zed config"
+            mark_skipped "Zed config"
+        fi
     fi
 }
 
@@ -246,64 +537,31 @@ setup_dev_tools() {
 # ───────────────────────────────────────────────────────────────────────────
 setup_productivity() {
     announce "Productivity Applications"
-    
-    # Install Ghostty
-    if ! is_cask_installed "ghostty"; then
-        brew install --cask ghostty
-        mark_installed "Ghostty"
-    else
-        mark_already "Ghostty"
-    fi
-    
+
+    install_cask_if_missing "Ghostty" "ghostty"
+
     # Configure Ghostty keybindings
     GHOSTTY_CONFIG_DIR="$HOME/.config/ghostty"
     GHOSTTY_CONFIG_FILE="$GHOSTTY_CONFIG_DIR/config"
-    
+
     if [[ -d "$GHOSTTY_CONFIG_DIR" && -f "$GHOSTTY_CONFIG_FILE" ]]; then
         mark_already "Ghostty keybindings"
     else
-        echo "Setting up Ghostty configuration..."
-        mkdir -p "$GHOSTTY_CONFIG_DIR"
-        if ! grep -q "ctrl+shift+r=reload_config" "$GHOSTTY_CONFIG_FILE" 2>/dev/null; then
-            echo 'keybind = "ctrl+shift+r=reload_config"' >> "$GHOSTTY_CONFIG_FILE"
+        if confirm_action "Configure Ghostty keybindings?" "Y"; then
+            echo "Setting up Ghostty configuration..."
+            append_line_if_missing 'keybind = "ctrl+shift+r=reload_config"' "$GHOSTTY_CONFIG_FILE"
+            append_line_if_missing 'keybind = "ctrl+shift+t=reset"' "$GHOSTTY_CONFIG_FILE"
+            mark_installed "Ghostty keybindings"
+        else
+            echo "Skipping Ghostty keybindings"
+            mark_skipped "Ghostty keybindings"
         fi
-        if ! grep -q "ctrl+shift+t=reset" "$GHOSTTY_CONFIG_FILE" 2>/dev/null; then
-            echo 'keybind = "ctrl+shift+t=reset"' >> "$GHOSTTY_CONFIG_FILE"
-        fi
-        mark_installed "Ghostty keybindings"
     fi
-    
-    # Install Zen Browser
-    if ! is_cask_installed "zen"; then
-        brew install --cask zen
-        mark_installed "Zen Browser"
-    else
-        mark_already "Zen Browser"
-    fi
-    
-    # Install Obsidian
-    if ! is_cask_installed "obsidian"; then
-        brew install --cask obsidian
-        mark_installed "Obsidian"
-    else
-        mark_already "Obsidian"
-    fi
-    
-    # Install Rectangle
-    if ! is_cask_installed "rectangle"; then
-        brew install --cask rectangle
-        mark_installed "Rectangle"
-    else
-        mark_already "Rectangle"
-    fi
-    
-    # Install Bitwarden
-    if ! is_cask_installed "bitwarden"; then
-        brew install --cask bitwarden
-        mark_installed "Bitwarden"
-    else
-        mark_already "Bitwarden"
-    fi
+
+    install_cask_if_missing "Zen Browser" "zen"
+    install_cask_if_missing "Obsidian" "obsidian"
+    install_cask_if_missing "Rectangle" "rectangle"
+    install_cask_if_missing "Bitwarden" "bitwarden"
 }
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -311,55 +569,29 @@ setup_productivity() {
 # ───────────────────────────────────────────────────────────────────────────
 setup_kubernetes() {
     announce "Kubernetes Tools"
-    
-    # Install Docker Desktop
-    if [ -d "/Applications/Docker.app" ]; then
+
+    if [[ -d "/Applications/Docker.app" ]]; then
         mark_already "Docker"
     else
-        echo "Installing Docker..."
-        brew install --cask docker
-        mark_installed "Docker"
+        if confirm_action "Install Docker Desktop?" "Y"; then
+            echo "Installing Docker..."
+            if ensure_homebrew_available "Docker"; then
+                run_cmd brew install --cask docker
+                mark_installed "Docker"
+            else
+                mark_skipped "Docker"
+            fi
+        else
+            echo "Skipping Docker"
+            mark_skipped "Docker"
+        fi
     fi
-    
-    # Install lazydocker
-    if ! command -v lazydocker &> /dev/null; then
-        brew install lazydocker
-        mark_installed "lazydocker"
-    else
-        mark_already "lazydocker"
-    fi
-    
-    # Install kubectl
-    if ! command -v kubectl &> /dev/null; then
-        brew install kubectl
-        mark_installed "kubectl"
-    else
-        mark_already "kubectl"
-    fi
-    
-    # Install Helm
-    if ! command -v helm &> /dev/null; then
-        brew install helm
-        mark_installed "Helm"
-    else
-        mark_already "Helm"
-    fi
-    
-    # Install Minikube
-    if ! command -v minikube &> /dev/null; then
-        brew install minikube
-        mark_installed "Minikube"
-    else
-        mark_already "Minikube"
-    fi
-    
-    # Install K9s
-    if ! command -v k9s &> /dev/null; then
-        brew install derailed/k9s/k9s
-        mark_installed "K9s"
-    else
-        mark_already "K9s"
-    fi
+
+    install_formula_if_missing "lazydocker" "lazydocker" brew install lazydocker
+    install_formula_if_missing "kubectl" "kubectl" brew install kubectl
+    install_formula_if_missing "Helm" "helm" brew install helm
+    install_formula_if_missing "Minikube" "minikube" brew install minikube
+    install_formula_if_missing "K9s" "k9s" brew install derailed/k9s/k9s
 }
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -367,34 +599,27 @@ setup_kubernetes() {
 # ───────────────────────────────────────────────────────────────────────────
 setup_cli_tools() {
     announce "Enhanced CLI Tools"
-    
-    if ! command -v bat &> /dev/null; then
-        brew install bat
-        mark_installed "bat"
-    else
-        mark_already "bat"
-    fi
-    
-    if ! command -v eza &> /dev/null; then
-        brew install eza
-        mark_installed "eza"
-    else
-        mark_already "eza"
-    fi
-    
+
+    install_formula_if_missing "bat" "bat" brew install bat
+    install_formula_if_missing "eza" "eza" brew install eza
+
     if ! command -v rg &> /dev/null; then
-        brew install ripgrep
-        mark_installed "ripgrep"
+        if confirm_action "Install ripgrep?" "Y"; then
+            if ensure_homebrew_available "ripgrep"; then
+                run_cmd brew install ripgrep
+                mark_installed "ripgrep"
+            else
+                mark_skipped "ripgrep"
+            fi
+        else
+            echo "Skipping ripgrep"
+            mark_skipped "ripgrep"
+        fi
     else
         mark_already "ripgrep"
     fi
-    
-    if ! command -v zellij &> /dev/null; then
-        brew install zellij
-        mark_installed "zellij"
-    else
-        mark_already "zellij"
-    fi
+
+    install_formula_if_missing "zellij" "zellij" brew install zellij
 }
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -402,20 +627,47 @@ setup_cli_tools() {
 # ───────────────────────────────────────────────────────────────────────────
 setup_pi_extensions() {
     announce "Pi Extensions Only"
-    
+
+    local PI_EXTENSIONS_SETUP
+    local args=()
+    local exit_code
+
     PI_EXTENSIONS_SETUP="$(dirname "$0")/pi-extensions/setup.sh"
-    
-    if [[ -f "$PI_EXTENSIONS_SETUP" ]]; then
-        if [[ "$DRY_RUN" == "true" ]]; then
-            echo "Would run: $PI_EXTENSIONS_SETUP --dry-run"
-        else
-            chmod +x "$PI_EXTENSIONS_SETUP"
-            "$PI_EXTENSIONS_SETUP" --force
+
+    if [[ ! -f "$PI_EXTENSIONS_SETUP" ]]; then
+        echo -e "${RED}✗${NC} pi-extensions/setup.sh not found"
+        mark_skipped "Pi Extensions"
+        return 0
+    fi
+
+    chmod +x "$PI_EXTENSIONS_SETUP"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        args+=("--dry-run")
+    fi
+
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        args+=("--force")
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf "Would run: %q" "$PI_EXTENSIONS_SETUP"
+        if [[ ${#args[@]} -gt 0 ]]; then
+            printf " %q" "${args[@]}"
         fi
+        printf "\n"
+    fi
+
+    if "$PI_EXTENSIONS_SETUP" "${args[@]}"; then
         mark_installed "Pi Extensions"
     else
-        echo -e "${RED}✗${NC} pi-extensions/setup.sh not found"
-        mark_already "Pi Extensions (skipped - not found)"
+        exit_code=$?
+        if [[ $exit_code -eq 2 ]]; then
+            echo "Skipping Pi Extensions"
+            mark_skipped "Pi Extensions"
+            return 0
+        fi
+        return $exit_code
     fi
 }
 
@@ -433,16 +685,19 @@ show_menu() {
     box_line "4) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
     box_line "5) CLI Tools     - bat, eza, ripgrep, zellij"
     box_sep
-    box_line "6) Pi Extensions - web-search, exit, permissions"
+    box_line "6) Pi Extensions - ask, permissions, share, web-access"
     box_sep
     box_line "A) Install All   - Run all categories above"
     box_line "C) Custom Select - Choose specific categories"
-    box_line "Q) Quit         - Exit without installing"
+    box_line "Q) Quit          - Exit without installing"
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 }
 
 custom_selection() {
+    local selection
+    local item
+
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════════╗"
     box_line "Custom Category Selection"
@@ -454,21 +709,16 @@ custom_selection() {
     box_line "3  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
     box_line "4  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
     box_line "5  - CLI Tools     (bat, eza, ripgrep, zellij)"
-    box_line "6  - Pi Extensions (web-search, exit, permissions)"
+    box_line "6  - Pi Extensions (ask, permissions, share, web-access)"
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -n "Enter selection: "
     read -r selection
-    
+
     for item in $selection; do
-        case $item in
-            1) setup_core ;;
-            2) setup_dev_tools ;;
-            3) setup_productivity ;;
-            4) setup_kubernetes ;;
-            5) setup_cli_tools ;;
-            6) setup_pi_extensions ;;
-        esac
+        if ! run_category_selection "$item"; then
+            echo -e "${YELLOW}⚠ Ignoring unknown category selection: $item${NC}"
+        fi
     done
 }
 
@@ -481,26 +731,40 @@ show_summary() {
     echo -e "${CYAN}                         SETUP SUMMARY${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
     echo ""
-    
-    echo "Installed:"
-    if [ ${#INSTALLED_PACKAGES[@]} -gt 0 ]; then
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "Would install or configure:"
+    else
+        echo "Installed or configured:"
+    fi
+    if [[ ${#INSTALLED_PACKAGES[@]} -gt 0 ]]; then
         for PACKAGE in "${INSTALLED_PACKAGES[@]}"; do
             echo -e "  ${GREEN}✓${NC} $PACKAGE"
         done
     else
         echo "  (none)"
     fi
-    
+
     echo ""
     echo "Already set up:"
-    if [ ${#ALREADY_SETUP_PACKAGES[@]} -gt 0 ]; then
+    if [[ ${#ALREADY_SETUP_PACKAGES[@]} -gt 0 ]]; then
         for PACKAGE in "${ALREADY_SETUP_PACKAGES[@]}"; do
             echo -e "  ${YELLOW}↺${NC} $PACKAGE"
         done
     else
         echo "  (none)"
     fi
-    
+
+    echo ""
+    echo "Skipped:"
+    if [[ ${#SKIPPED_PACKAGES[@]} -gt 0 ]]; then
+        for PACKAGE in "${SKIPPED_PACKAGES[@]}"; do
+            echo -e "  ${MAGENTA}•${NC} $PACKAGE"
+        done
+    else
+        echo "  (none)"
+    fi
+
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
     echo -e "${CYAN}                        SETUP COMPLETE${NC}"
@@ -512,72 +776,65 @@ show_summary() {
 # MAIN
 # ───────────────────────────────────────────────────────────────────────────
 main() {
+    local choice
+
     # Header
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════════════════════════════════════╗"
     box_line "Fresh macOS Setup"
     box_line "Modular Development Environment"
     box_sep
-    box_line "Select an option to begin or press Ctrl+C to exit"
+    if [[ "$INTERACTIVE_MODE" == "true" ]]; then
+        box_line "Guided mode: you will be prompted before install steps"
+    else
+        box_line "Select an option to begin or press Ctrl+C to exit"
+    fi
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    
+
     if [[ "$DRY_RUN" == "true" ]]; then
         echo -e "${YELLOW}DRY RUN MODE - No changes will be made${NC}"
         echo ""
     fi
-    
+
     if [[ -n "$CATEGORY" ]]; then
-        # Single category mode
-        case "$CATEGORY" in
-            core) setup_core ;;
-            dev-tools|devtools) setup_dev_tools ;;
-            productivity) setup_productivity ;;
-            kubernetes|k8s) setup_kubernetes ;;
-            cli-tools|clitools) setup_cli_tools ;;
-            pi-extensions|piextensions) setup_pi_extensions ;;
-            all) setup_core; setup_dev_tools; setup_productivity; setup_kubernetes; setup_cli_tools; setup_pi_extensions ;;
-            *)
-                echo -e "${RED}Unknown category: $CATEGORY${NC}"
-                echo "Use --help to see available categories"
-                exit 1
-                ;;
-        esac
+        if ! run_category_selection "$CATEGORY"; then
+            echo -e "${RED}Unknown category: $CATEGORY${NC}"
+            echo "Use --help to see available categories"
+            exit 1
+        fi
     elif [[ "$INSTALL_ALL" == "true" ]]; then
-        # Install all mode
-        setup_core
-        setup_dev_tools
-        setup_productivity
-        setup_kubernetes
-        setup_cli_tools
-        setup_pi
+        run_category_selection "all"
+    elif [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        echo -e "${RED}Interactive mode requires a TTY.${NC}"
+        echo "Use --all or --category <name> when running non-interactively."
+        exit 1
     else
-        # Interactive menu mode
         show_menu
         echo -n "Select option: "
         read -r choice
-        
+
         case "$choice" in
-            1) setup_core ;;
-            2) setup_dev_tools ;;
-            3) setup_productivity ;;
-            4) setup_kubernetes ;;
-            5) setup_cli_tools ;;
-            6) setup_pi_extensions ;;
-            a|A) 
-                setup_core
-                setup_dev_tools
-                setup_productivity
-                setup_kubernetes
-                setup_cli_tools
-                setup_pi_extensions
+            1|2|3|4|5|6)
+                run_category_selection "$choice"
                 ;;
-            c|C) custom_selection ;;
-            q|Q) echo "Exiting..."; exit 0 ;;
-            *) echo -e "${RED}Invalid option${NC}"; exit 1 ;;
+            a|A)
+                run_category_selection "all"
+                ;;
+            c|C)
+                custom_selection
+                ;;
+            q|Q)
+                echo "Exiting..."
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                exit 1
+                ;;
         esac
     fi
-    
+
     show_summary
 }
 
