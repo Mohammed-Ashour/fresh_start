@@ -6,11 +6,13 @@
 # For full pi setup (settings, MCP, etc.), use: ./pi-setup/setup.sh
 #
 # Extensions included:
-# - web-search.ts: Web search and fetch tools
 # - exit-command.ts: /exit as alias for /quit
 # - permission-gate.ts: Permission gate for dangerous commands (uses permissions.json)
 # - permissions.json: Permission modes configuration for permission-gate.ts
-# - share-local.ts: Export session to HTML and open in browser
+# - share-local.ts: Export session to HTML and open browser preview
+#
+# Pi package installed:
+# - npm:pi-web-access (replaces legacy local web-search.ts)
 #
 # Usage:
 #   ./setup.sh              # Interactive mode
@@ -137,18 +139,31 @@ echo "  Source: $SETUP_DIR/extensions/"
 echo "  Target: $PI_DIR/extensions/"
 echo ""
 
-# Count extensions
+# Count extensions (ignore disabled backups like *.disabled)
 if [[ -d "$SETUP_DIR/extensions" && -n "$(ls -A "$SETUP_DIR/extensions" 2>/dev/null)" ]]; then
-    EXTENSION_COUNT=$(find "$SETUP_DIR/extensions" -maxdepth 1 -type f | wc -l | tr -d ' ')
+    EXTENSION_COUNT=$(find "$SETUP_DIR/extensions" -maxdepth 1 -type f \( -name "*.ts" -o -name "*.json" \) | wc -l | tr -d ' ')
     echo "  Found $EXTENSION_COUNT extension(s) to install:"
-    
-    for item in "$SETUP_DIR/extensions"/*; do
-        if [[ -f "$item" ]]; then
-            install_extension "$item"
-        fi
+
+    for item in "$SETUP_DIR/extensions"/*.ts "$SETUP_DIR/extensions"/*.json; do
+        [[ -f "$item" ]] || continue
+        install_extension "$item"
     done
 else
     echo -e "  ${YELLOW}⚠ No extensions found in $SETUP_DIR/extensions/${NC}"
+fi
+
+echo ""
+
+echo -e "${BLUE}▸ Pi package${NC}"
+if ! command -v pi &>/dev/null; then
+    echo -e "  ${YELLOW}⚠ Skipping npm:pi-web-access (pi command not found)${NC}"
+elif [[ "$DRY_RUN" == "true" ]]; then
+    echo "  Would run: pi install npm:pi-web-access"
+else
+    echo -e "  ${GREEN}→${NC} Installing npm:pi-web-access"
+    if ! pi install npm:pi-web-access; then
+        echo -e "  ${YELLOW}⚠ Failed to install npm:pi-web-access${NC}"
+    fi
 fi
 
 echo ""
@@ -162,10 +177,6 @@ if [[ "$DRY_RUN" == "false" ]]; then
         if [[ -f "$item" ]]; then
             name=$(basename "$item")
             case "$name" in
-                web-search.ts)
-                    echo -e "  ${GREEN}✓${NC} web-search.ts - Web search and fetch via DuckDuckGo"
-                    ((INSTALLED_COUNT++))
-                    ;;
                 exit-command.ts)
                     echo -e "  ${GREEN}✓${NC} exit-command.ts - /exit as alias for /quit"
                     ((INSTALLED_COUNT++))
@@ -176,7 +187,7 @@ if [[ "$DRY_RUN" == "false" ]]; then
                     ;;
                 permissions.json)
                     echo -e "  ${GREEN}✓${NC} permissions.json - Permission modes configuration"
-                    echo "      Mode: acceptEdits (edits auto-allow, bash confirms, dangerous blocked)"
+                    echo "      Mode: safeMode (dangerous commands blocked by default)"
                     ((INSTALLED_COUNT++))
                     ;;
                 share-local.ts)
@@ -205,14 +216,19 @@ fi
 
 echo "Installed extensions:"
 if [[ $INSTALLED_COUNT -gt 0 ]]; then
-    echo "  • web-search.ts - Web search and fetch"
     echo "  • exit-command.ts - /exit command alias"
     echo "  • permission-gate.ts - Permission gate for dangerous commands"
     echo "  • permissions.json - Permission modes configuration"
     echo "  • share-local.ts - Export session to HTML and open in browser"
+    echo "  • ask-questions.ts - Multi-question picker tool"
+    echo "  • context-usage.ts - Context usage footer"
 else
     echo "  (none - all were already installed or not found)"
 fi
+
+echo ""
+echo "Pi package:"
+echo "  • npm:pi-web-access - Web search + fetch provider package"
 
 echo ""
 echo "Next steps:"

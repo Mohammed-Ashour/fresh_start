@@ -685,7 +685,7 @@ show_menu() {
     box_line "4) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
     box_line "5) CLI Tools     - bat, eza, ripgrep, zellij"
     box_sep
-    box_line "6) Pi Extensions - ask, permissions, share, web-access"
+    box_line "6) Pi Extensions - ask, exit, permissions, share, web-access"
     box_sep
     box_line "A) Install All   - Run all categories above"
     box_line "C) Custom Select - Choose specific categories"
@@ -709,7 +709,7 @@ custom_selection() {
     box_line "3  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
     box_line "4  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
     box_line "5  - CLI Tools     (bat, eza, ripgrep, zellij)"
-    box_line "6  - Pi Extensions (ask, permissions, share, web-access)"
+    box_line "6  - Pi Extensions (ask, exit, permissions, share, web-access)"
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -n "Enter selection: "
