@@ -8,6 +8,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 ./init_macos.sh                    # Interactive guided menu
 ./init_macos.sh --all              # Install all categories
 ./init_macos.sh --category core    # Install one category
+./init_macos.sh --category zed     # Install Zed only
 ./init_macos.sh --dry-run          # Preview changes without modifying your system
 ./init_macos.sh --help             # Show all options
 ```
@@ -23,7 +24,8 @@ Modular macOS development environment setup with an interactive menu, guided ins
 | Category | Includes |
 |----------|----------|
 | `core` | Homebrew, Zsh, Oh My Zsh, Git |
-| `dev-tools` | VS Code:, Zed, lazygit, fzf, tmux |
+| `dev-tools` | VS Code, lazygit, fzf, tmux |
+| `zed` | Zed editor, bundled settings |
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
