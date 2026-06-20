@@ -13,7 +13,7 @@
 #   ./init_macos.sh --dry-run          # Show what would be done
 #
 # Categories:
-#   core, dev-tools, productivity, kubernetes, cli-tools, pi-extensions
+#   core, dev-tools, zed, productivity, kubernetes, cli-tools, pi-extensions, pi-skills
 #
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -80,11 +80,13 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Categories:"
             echo "  core           - Homebrew, Zsh, Oh My Zsh, Git"
-            echo "  dev-tools      - VS Code, Zed, lazygit, fzf, tmux"
+            echo "  dev-tools      - VS Code, lazygit, fzf, tmux"
+            echo "  zed            - Zed editor + settings"
             echo "  productivity   - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
             echo "  kubernetes     - Docker, kubectl, Helm, Minikube, K9s"
             echo "  cli-tools      - bat, eza, ripgrep, zellij, lazydocker"
             echo "  pi-extensions  - Pi extensions + LazyPi web access"
+            echo "  pi-skills      - Pi agent skills (review, ponytail, agdr, ...)"
             exit 0
             ;;
         *)
@@ -295,8 +297,14 @@ install_formula_if_missing() {
 install_cask_if_missing() {
     local label="$1"
     local cask_name="$2"
+    local app_path="${3:-}"
 
     if is_cask_installed "$cask_name"; then
+        mark_already "$label"
+        return 0
+    fi
+
+    if [[ -n "$app_path" && -d "$app_path" ]]; then
         mark_already "$label"
         return 0
     fi
@@ -324,25 +332,33 @@ run_category_selection() {
         2|dev-tools|devtools)
             setup_dev_tools
             ;;
-        3|productivity)
+        3|zed)
+            setup_zed
+            ;;
+        4|productivity)
             setup_productivity
             ;;
-        4|kubernetes|k8s)
+        5|kubernetes|k8s)
             setup_kubernetes
             ;;
-        5|cli-tools|clitools)
+        6|cli-tools|clitools)
             setup_cli_tools
             ;;
-        6|pi-extensions|piextensions)
+        7|pi-extensions|piextensions)
             setup_pi_extensions
+            ;;
+        8|pi-skills|piskills)
+            setup_pi_skills
             ;;
         all)
             setup_core
             setup_dev_tools
+            setup_zed
             setup_productivity
             setup_kubernetes
             setup_cli_tools
             setup_pi_extensions
+            setup_pi_skills
             ;;
         *)
             return 1
@@ -505,8 +521,12 @@ setup_dev_tools() {
 
     install_formula_if_missing "tmux" "tmux" brew install tmux
     install_cask_if_missing "VS Code" "visual-studio-code"
+}
 
-    install_cask_if_missing "Zed" "zed"
+setup_zed() {
+    announce "Zed"
+
+    install_cask_if_missing "Zed" "zed" "/Applications/Zed.app"
 
     # Configure Zed
     ZED_CONFIG_DIR="$HOME/.config/zed"
@@ -671,6 +691,52 @@ setup_pi_extensions() {
     fi
 }
 
+setup_pi_skills() {
+    announce "Pi Skills Only"
+
+    local PI_SKILLS_SETUP
+    local args=()
+    local exit_code
+
+    PI_SKILLS_SETUP="$(dirname "$0")/pi-skills/setup.sh"
+
+    if [[ ! -f "$PI_SKILLS_SETUP" ]]; then
+        echo -e "${RED}✗${NC} pi-skills/setup.sh not found"
+        mark_skipped "Pi Skills"
+        return 0
+    fi
+
+    chmod +x "$PI_SKILLS_SETUP"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        args+=("--dry-run")
+    fi
+
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        args+=("--force")
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        printf "Would run: %q" "$PI_SKILLS_SETUP"
+        if [[ ${#args[@]} -gt 0 ]]; then
+            printf " %q" "${args[@]}"
+        fi
+        printf "\n"
+    fi
+
+    if "$PI_SKILLS_SETUP" "${args[@]}"; then
+        mark_installed "Pi Skills"
+    else
+        exit_code=$?
+        if [[ $exit_code -eq 2 ]]; then
+            echo "Skipping Pi Skills"
+            mark_skipped "Pi Skills"
+            return 0
+        fi
+        return $exit_code
+    fi
+}
+
 # ───────────────────────────────────────────────────────────────────────────
 # INTERACTIVE MENU
 # ───────────────────────────────────────────────────────────────────────────
@@ -681,11 +747,13 @@ show_menu() {
     box_sep
     box_line "1) Core          - Homebrew, Zsh, Oh My Zsh, Git"
     box_line "2) Dev Tools     - VS Code, lazygit, fzf, tmux"
-    box_line "3) Productivity  - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
-    box_line "4) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
-    box_line "5) CLI Tools     - bat, eza, ripgrep, zellij"
+    box_line "3) Zed           - editor + settings"
+    box_line "4) Productivity  - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
+    box_line "5) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
+    box_line "6) CLI Tools     - bat, eza, ripgrep, zellij"
     box_sep
-    box_line "6) Pi Extensions - ask, permissions, share, web-access"
+    box_line "7) Pi Extensions - ask, exit, permissions, share, web-access"
+    box_line "8) Pi Skills     - review, ponytail, agdr, pr-review, handoff"
     box_sep
     box_line "A) Install All   - Run all categories above"
     box_line "C) Custom Select - Choose specific categories"
@@ -706,10 +774,12 @@ custom_selection() {
     box_line ""
     box_line "1  - Core          (Homebrew, Zsh, Git)"
     box_line "2  - Dev Tools     (VS Code, lazygit, fzf, tmux)"
-    box_line "3  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
-    box_line "4  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
-    box_line "5  - CLI Tools     (bat, eza, ripgrep, zellij)"
-    box_line "6  - Pi Extensions (ask, permissions, share, web-access)"
+    box_line "3  - Zed           (editor + settings)"
+    box_line "4  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
+    box_line "5  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
+    box_line "6  - CLI Tools     (bat, eza, ripgrep, zellij)"
+    box_line "7  - Pi Extensions (ask, exit, permissions, share, web-access)"
+    box_line "8  - Pi Skills     (review, ponytail, agdr, pr-review, handoff)"
     echo "╚══════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     echo -n "Enter selection: "
@@ -815,7 +885,7 @@ main() {
         read -r choice
 
         case "$choice" in
-            1|2|3|4|5|6)
+            1|2|3|4|5|6|7|8)
                 run_category_selection "$choice"
                 ;;
             a|A)

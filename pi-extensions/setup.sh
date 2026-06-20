@@ -6,11 +6,17 @@
 # For full pi setup (settings, MCP, etc.), use: ./pi-setup/setup.sh
 #
 # Extensions included:
-# - web-search.ts: Web search and fetch tools
 # - exit-command.ts: /exit as alias for /quit
 # - permission-gate.ts: Permission gate for dangerous commands (uses permissions.json)
 # - permissions.json: Permission modes configuration for permission-gate.ts
-# - share-local.ts: Export session to HTML and open in browser
+# - share-local.ts: Export session to HTML and open browser preview
+# - ask-questions.ts: Multi-question picker tool
+# - context-usage.ts: Context usage footer
+# - diff-review/: /diff-review in-TUI git diff review
+# - diff-review-web/: /diff-review-web browser-based diff review
+#
+# Pi package installed:
+# - npm:pi-web-access (replaces legacy local web-search.ts)
 #
 # Usage:
 #   ./setup.sh              # Interactive mode
@@ -109,25 +115,42 @@ copy_file() {
     return 0
 }
 
-# Function to install a single extension
+# Function to install a single extension (file or directory)
 install_extension() {
     local src="$1"
     local name=$(basename "$src")
     local dest="$PI_DIR/extensions/$name"
-    
-    if [[ ! -f "$src" ]]; then
+
+    if [[ ! -e "$src" ]]; then
         echo -e "  ${RED}✗${NC} Extension not found: $src"
         return 1
     fi
-    
-    if [[ -f "$dest" && "$FORCE" == "false" ]]; then
+
+    # Skip disabled backups (e.g. web-search.ts.disabled)
+    if [[ "$name" == *.disabled ]]; then
+        return 0
+    fi
+
+    local exists=false
+    if [[ -d "$src" ]]; then
+        [[ -d "$dest" ]] && exists=true
+    else
+        [[ -f "$dest" ]] && exists=true
+    fi
+
+    if [[ "$exists" == true && "$FORCE" == "false" ]]; then
         echo -e "  ${YELLOW}↺${NC} $name (already installed, use --force to update)"
         return 0
     fi
-    
+
     echo -e "  ${GREEN}→${NC} $name"
     if [[ "$DRY_RUN" == "false" ]]; then
-        cp "$src" "$dest"
+        if [[ -d "$src" ]]; then
+            rm -rf "$dest"
+            cp -R "$src" "$dest"
+        else
+            cp "$src" "$dest"
+        fi
     fi
     return 0
 }
@@ -137,18 +160,35 @@ echo "  Source: $SETUP_DIR/extensions/"
 echo "  Target: $PI_DIR/extensions/"
 echo ""
 
-# Count extensions
+# Count extensions (ignore disabled backups like *.disabled)
 if [[ -d "$SETUP_DIR/extensions" && -n "$(ls -A "$SETUP_DIR/extensions" 2>/dev/null)" ]]; then
-    EXTENSION_COUNT=$(find "$SETUP_DIR/extensions" -maxdepth 1 -type f | wc -l | tr -d ' ')
+    # Count active extensions: files (*.ts/*.json, excluding *.disabled) and directories
+    EXTENSION_FILE_COUNT=$(find "$SETUP_DIR/extensions" -maxdepth 1 -type f \( -name "*.ts" -o -name "*.json" \) ! -name "*.disabled" | wc -l | tr -d ' ')
+    EXTENSION_DIR_COUNT=$(find "$SETUP_DIR/extensions" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
+    EXTENSION_COUNT=$((EXTENSION_FILE_COUNT + EXTENSION_DIR_COUNT))
     echo "  Found $EXTENSION_COUNT extension(s) to install:"
-    
+
+    # Install every top-level item (files and directory extensions), skipping disabled backups
     for item in "$SETUP_DIR/extensions"/*; do
-        if [[ -f "$item" ]]; then
-            install_extension "$item"
-        fi
+        [[ -e "$item" ]] || continue
+        install_extension "$item"
     done
 else
     echo -e "  ${YELLOW}⚠ No extensions found in $SETUP_DIR/extensions/${NC}"
+fi
+
+echo ""
+
+echo -e "${BLUE}▸ Pi package${NC}"
+if ! command -v pi &>/dev/null; then
+    echo -e "  ${YELLOW}⚠ Skipping npm:pi-web-access (pi command not found)${NC}"
+elif [[ "$DRY_RUN" == "true" ]]; then
+    echo "  Would run: pi install npm:pi-web-access"
+else
+    echo -e "  ${GREEN}→${NC} Installing npm:pi-web-access"
+    if ! pi install npm:pi-web-access; then
+        echo -e "  ${YELLOW}⚠ Failed to install npm:pi-web-access${NC}"
+    fi
 fi
 
 echo ""
@@ -159,13 +199,10 @@ SKIPPED_COUNT=0
 
 if [[ "$DRY_RUN" == "false" ]]; then
     for item in "$PI_DIR/extensions"/*; do
-        if [[ -f "$item" ]]; then
+        if [[ -f "$item" || -d "$item" ]]; then
             name=$(basename "$item")
+            [[ "$name" == *.disabled ]] && continue
             case "$name" in
-                web-search.ts)
-                    echo -e "  ${GREEN}✓${NC} web-search.ts - Web search and fetch via DuckDuckGo"
-                    ((INSTALLED_COUNT++))
-                    ;;
                 exit-command.ts)
                     echo -e "  ${GREEN}✓${NC} exit-command.ts - /exit as alias for /quit"
                     ((INSTALLED_COUNT++))
@@ -176,11 +213,19 @@ if [[ "$DRY_RUN" == "false" ]]; then
                     ;;
                 permissions.json)
                     echo -e "  ${GREEN}✓${NC} permissions.json - Permission modes configuration"
-                    echo "      Mode: acceptEdits (edits auto-allow, bash confirms, dangerous blocked)"
+                    echo "      Mode: safeMode (dangerous commands blocked by default)"
                     ((INSTALLED_COUNT++))
                     ;;
                 share-local.ts)
                     echo -e "  ${GREEN}✓${NC} share-local.ts - Export session to HTML and open locally"
+                    ((INSTALLED_COUNT++))
+                    ;;
+                diff-review)
+                    echo -e "  ${GREEN}✓${NC} diff-review/ - /diff-review command for in-TUI diff review"
+                    ((INSTALLED_COUNT++))
+                    ;;
+                diff-review-web)
+                    echo -e "  ${GREEN}✓${NC} diff-review-web/ - /diff-review-web browser-based diff review"
                     ((INSTALLED_COUNT++))
                     ;;
                 *)
@@ -205,14 +250,21 @@ fi
 
 echo "Installed extensions:"
 if [[ $INSTALLED_COUNT -gt 0 ]]; then
-    echo "  • web-search.ts - Web search and fetch"
     echo "  • exit-command.ts - /exit command alias"
     echo "  • permission-gate.ts - Permission gate for dangerous commands"
     echo "  • permissions.json - Permission modes configuration"
     echo "  • share-local.ts - Export session to HTML and open in browser"
+    echo "  • ask-questions.ts - Multi-question picker tool"
+    echo "  • context-usage.ts - Context usage footer"
+    echo "  • diff-review/ - /diff-review in-TUI diff review"
+    echo "  • diff-review-web/ - /diff-review-web browser-based diff review"
 else
     echo "  (none - all were already installed or not found)"
 fi
+
+echo ""
+echo "Pi package:"
+echo "  • npm:pi-web-access - Web search + fetch provider package"
 
 echo ""
 echo "Next steps:"

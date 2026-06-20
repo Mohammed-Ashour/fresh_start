@@ -77,8 +77,8 @@ const DEFAULT_DANGEROUS: PatternRule[] = [
 	{ pattern: "python.*\\|.*sh", description: "pipe python to shell execution" },
 	{ pattern: "node.*\\|.*sh", description: "pipe node to shell execution" },
 	{ pattern: "ruby.*\\|.*sh", description: "pipe ruby to shell execution" },
-	{ pattern: "rm -rf /", description: "delete root directory" },
-	{ pattern: "rm -rf /*", description: "delete root contents" },
+	{ pattern: "(?:^|[;&|]\\s*)rm\\s+-rf\\s+/(?:\\s|$)", description: "delete root directory" },
+	{ pattern: "(?:^|[;&|]\\s*)rm\\s+-rf\\s+/\\*(?:\\s|$)", description: "delete root contents" },
 	{ pattern: "git push --force", description: "force push to remote" },
 	{ pattern: "git push -f", description: "force push to remote" },
 	{ pattern: "docker rm -f", description: "force remove docker container" },
@@ -93,10 +93,10 @@ const DEFAULT_DANGEROUS: PatternRule[] = [
 ];
 
 const DEFAULT_CATASTROPHIC: PatternRule[] = [
-	{ pattern: "sudo rm -rf /", description: "sudo recursive delete root" },
-	{ pattern: "sudo rm -rf /*", description: "sudo recursive delete root contents" },
-	{ pattern: "rm -rf /", description: "recursive delete root" },
-	{ pattern: "rm -rf /*", description: "recursive delete root contents" },
+	{ pattern: "(?:^|[;&|]\\s*)sudo\\s+rm\\s+-rf\\s+/(?:\\s|$)", description: "sudo recursive delete root" },
+	{ pattern: "(?:^|[;&|]\\s*)sudo\\s+rm\\s+-rf\\s+/\\*(?:\\s|$)", description: "sudo recursive delete root contents" },
+	{ pattern: "(?:^|[;&|]\\s*)rm\\s+-rf\\s+/(?:\\s|$)", description: "recursive delete root" },
+	{ pattern: "(?:^|[;&|]\\s*)rm\\s+-rf\\s+/\\*(?:\\s|$)", description: "recursive delete root contents" },
 	{ pattern: "sudo mkfs", description: "sudo filesystem format" },
 	{ pattern: "\\bmkfs\\b", description: "filesystem format" },
 	{ pattern: "dd if=", description: "raw disk read" },
@@ -338,8 +338,8 @@ export default async function (pi: ExtensionAPI) {
 			if (!exemptCommandRegex.test(command)) {
 				const catastrophe = matchesRule(command, catastrophicPatterns);
 				if (catastrophe) {
-					ctx.ui.notify(`🚫 Catastrophic: ${catastrophe.description}`, "error");
-					return { block: true, reason: `Catastrophic: ${catastrophe.description}` };
+					ctx.ui.notify(`🚫 Catastrophic blocked before execution: ${catastrophe.description}`, "error");
+					return { block: true, reason: `Catastrophic blocked before execution: ${catastrophe.description}` };
 				}
 			}
 		}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codebase Cleanup Audit"
+  short_description: "Analyze repos for dead code and cleanup opportunities"
+  default_prompt: "Analyze this repository for removable code, imports, files, and dependencies; produce a confidence-scored cleanup report without editing files."

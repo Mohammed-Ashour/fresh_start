@@ -29,6 +29,10 @@
       "effort": "high",
       "enable_thinking": true,
       "provider": "copilot_chat",
+      "model": "gpt-5.4"
+    },
+    "commit_message_model": {
+      "provider": "copilot_chat",
       "model": "gpt-5-mini"
     }
   },
