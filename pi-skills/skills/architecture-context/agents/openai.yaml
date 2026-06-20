@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Context"
+  short_description: "Generate constrained, evidence-backed architecture docs."
+  default_prompt: "Use $architecture-context to generate or update ARCHITECTURE.md with the required section template, repository evidence checks, and no-invention constraints."

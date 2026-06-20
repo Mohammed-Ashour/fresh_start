@@ -1,0 +1,5 @@
+interface:
+  display_name: PR Review Guide
+  short_description: Generate a reviewer guide for long pull requests and optionally post it as a GitHub comment.
+  icon: file-text
+  color: blue
