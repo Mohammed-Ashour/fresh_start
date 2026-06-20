@@ -29,7 +29,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
-| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, pi-web-access |
+| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, pi-web-access |
 
 ## Pi Extensions
 
@@ -87,6 +87,19 @@ Or install them through the main setup script:
 - `/share-local` exports the current session to HTML
 - opens locally using a supported browser or OS opener when available
 - supports `--path` and `--copy`
+
+**Diff Review**
+- `/diff-review` reviews the current working tree diff in-TUI
+- `/diff-review --cached` reviews staged changes
+- `/diff-review main...HEAD` reviews a custom git diff range
+- `/diff-review-theme` switches to the bundled GitHub-like theme
+
+**Diff Review Web**
+- `/diff-review-web` opens the current working tree diff in a browser
+- inline per-line comments, then **End review** loads notes back into pi
+- `/diff-review-web --cached` reviews staged changes
+- `/diff-review-web main...HEAD` reviews a custom diff range
+- `/diff-review-web-stop` stops the localhost review server
 
 ## After Setup
 
