@@ -160,6 +160,13 @@ echo "  Source: $SETUP_DIR/extensions/"
 echo "  Target: $PI_DIR/extensions/"
 echo ""
 
+if [[ ! -d "$PI_DIR/extensions" ]]; then
+    echo -e "  Creating directory: $PI_DIR/extensions"
+    if [[ "$DRY_RUN" == "false" ]]; then
+        mkdir -p "$PI_DIR/extensions"
+    fi
+fi
+
 # Count extensions (ignore disabled backups like *.disabled)
 if [[ -d "$SETUP_DIR/extensions" && -n "$(ls -A "$SETUP_DIR/extensions" 2>/dev/null)" ]]; then
     # Count active extensions: files (*.ts/*.json, excluding *.disabled) and directories
