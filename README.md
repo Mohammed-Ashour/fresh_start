@@ -30,7 +30,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
 | `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, mini-agents, pi-web-access |
-| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, security-best-practices, simplify, unit-test-aaa |
+| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
 
 ## Pi Skills
 
@@ -72,9 +72,18 @@ Each skill gets one status line: installed, updated, up to date, or kept because
 | `pr-splitter` | Split oversized PRs into smaller scoped PRs |
 | `review` | Correctness-focused code review |
 | `review-story` | Concise narrative walkthrough of PR changes |
+| `science-pr-review` | Stage 0-5 science-model lifecycle gate; used by skipper-review on science PRs |
 | `security-best-practices` | Language/framework security best-practice reviews |
+| `show-me` | Explain a topic visually with diagrams, code sketches, and small HTML artifacts |
 | `simplify` | Review recent changes for reuse, quality, efficiency |
+| `skipper-audit` | Evidence-based health audit of a repo or subsystem |
+| `skipper-implement` | Smallest safe change for Python, Airflow, geospatial, Terraform, k8s, CI/CD |
+| `skipper-review` | Review a PR, diff, branch, or commit for correctness, safety, and complexity |
+| `skipper-review-deep` | Line-by-line deep review, building on skipper-review |
+| `skipper-teach` | One focused offline HTML lesson on a data or platform engineering topic |
+| `skipper-test-coverage` | Behavior-level test coverage assessment with ranked gaps |
 | `unit-test-aaa` | Write pytest tests in Arrange-Act-Assert pattern |
+| `unslop` | Cut AI tells from any writing |
 
 ## Pi Extensions
 
