@@ -29,7 +29,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
-| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, pi-web-access |
+| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, mini-agents, pi-web-access |
 | `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, security-best-practices, simplify, unit-test-aaa |
 
 ## Pi Skills
@@ -149,6 +149,17 @@ Or install them through the main setup script:
 - `/diff-review-web --cached` reviews staged changes
 - `/diff-review-web main...HEAD` reviews a custom diff range
 - `/diff-review-web-stop` stops the localhost review server
+
+**Mini Agents**
+- `/reviewers <request>` runs a background code review, e.g. `/reviewers skipper review the current PR`
+- `/researchers <question>` runs two background researchers: one gathers sources, one looks for counterevidence
+- your skills drive the work: name the style you want, e.g. "skipper review" or "deep review"
+- PR URL, "current PR", or "PR #n" reviews the committed PR through `gh`, without checking it out
+- reviews and research run concurrently and post results to the chat when done
+- `--context` adds the current conversation as background; agents start fresh by default
+- subcommands: `model`, `peek` (live log), `stop`, `help`, with autocomplete
+- read-only: agents never edit files, run commands, or post to GitHub
+- needs `pi-web-access` for research and an authenticated `gh` for PR reviews; see `pi-extensions/extensions/mini-agents/README.md`
 
 ## After Setup
 

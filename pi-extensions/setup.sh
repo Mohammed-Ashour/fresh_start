@@ -14,6 +14,7 @@
 # - context-usage.ts: Context usage footer
 # - diff-review/: /diff-review in-TUI git diff review
 # - diff-review-web/: /diff-review-web browser-based diff review
+# - mini-agents/: /reviewers and /researchers background subagents (needs pi-web-access; gh for PR reviews)
 #
 # Pi package installed:
 # - npm:pi-web-access (replaces legacy local web-search.ts)
@@ -235,6 +236,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
                     echo -e "  ${GREEN}✓${NC} diff-review-web/ - /diff-review-web browser-based diff review"
                     ((INSTALLED_COUNT++))
                     ;;
+                mini-agents)
+                    echo -e "  ${GREEN}✓${NC} mini-agents/ - /reviewers and /researchers background subagents"
+                    ((INSTALLED_COUNT++))
+                    ;;
                 *)
                     echo -e "  ${GREEN}✓${NC} $name"
                     ((INSTALLED_COUNT++))
@@ -265,6 +270,7 @@ if [[ $INSTALLED_COUNT -gt 0 ]]; then
     echo "  • context-usage.ts - Context usage footer"
     echo "  • diff-review/ - /diff-review in-TUI diff review"
     echo "  • diff-review-web/ - /diff-review-web browser-based diff review"
+    echo "  • mini-agents/ - /reviewers and /researchers background subagents"
 else
     echo "  (none - all were already installed or not found)"
 fi
