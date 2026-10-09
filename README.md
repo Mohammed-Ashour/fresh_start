@@ -34,21 +34,17 @@ Modular macOS development environment setup with an interactive menu, guided ins
 
 ## Pi Skills
 
-Install all Pi agent skills directly. Each skill is a directory containing a `SKILL.md` (plus optional `references/`, `agents/`, `scripts/` assets) copied into `~/.agents/skills/`. Running without flags installs any missing skills:
+Each skill is a directory containing a `SKILL.md` (plus optional `references/`, `agents/`, `scripts/` assets) copied into `~/.agents/skills/`:
 
 ```bash
-./pi-skills/setup.sh
+./pi-skills/setup.sh                       # install all skills
+./pi-skills/setup.sh skipper-review unslop # install only these
+./pi-skills/setup.sh --list                # what's available and what's installed
+./pi-skills/setup.sh --dry-run             # preview, change nothing
+./pi-skills/setup.sh --force               # also replace copies you edited locally
 ```
 
-Useful options:
-
-```bash
-./pi-skills/setup.sh --dry-run
-./pi-skills/setup.sh --force
-./pi-skills/setup.sh --help
-```
-
-Or install them through the main setup script:
+Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Reruns are safe and only copy what changed. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-skills
@@ -82,21 +78,17 @@ Or install them through the main setup script:
 
 ## Pi Extensions
 
-Install all Pi extensions directly. Running without flags opens an interactive chooser:
+Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-access` package is installed through `pi`:
 
 ```bash
-./pi-extensions/setup.sh
+./pi-extensions/setup.sh                   # install all extensions + pi-web-access
+./pi-extensions/setup.sh mini-agents       # install only these
+./pi-extensions/setup.sh --list            # what's available and what's installed
+./pi-extensions/setup.sh --dry-run         # preview, change nothing
+./pi-extensions/setup.sh --force           # also replace copies you edited locally
 ```
 
-Useful options:
-
-```bash
-./pi-extensions/setup.sh --dry-run
-./pi-extensions/setup.sh --force
-./pi-extensions/setup.sh --help
-```
-
-Or install them through the main setup script:
+Same status lines as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-extensions
