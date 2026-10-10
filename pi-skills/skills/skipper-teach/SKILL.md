@@ -27,18 +27,18 @@ Use this order when instructions compete:
 
 ## Engineering references
 
-Treat the bundled references as canonical policy for the active lesson boundary. Read [references/core-principles.md](references/core-principles.md) before non-trivial lesson work, then read only the stack references needed to teach a live decision:
+Treat the bundled references as canonical policy for the active lesson boundary. Read [references/core-principles.md](../skipper-core/references/core-principles.md) before non-trivial lesson work, then read only the stack references needed to teach a live decision:
 
-- [references/python.md](references/python.md)
-- [references/airflow.md](references/airflow.md)
-- [references/scientific-geospatial.md](references/scientific-geospatial.md)
-- [references/terraform.md](references/terraform.md)
-- [references/kubernetes.md](references/kubernetes.md)
-- [references/ci-cd.md](references/ci-cd.md)
-- [references/databases-migrations.md](references/databases-migrations.md)
-- [references/data-pipelines-contracts.md](references/data-pipelines-contracts.md)
-- [references/observability-recovery.md](references/observability-recovery.md)
-- [references/security.md](references/security.md)
+- [references/python.md](../skipper-core/references/python.md)
+- [references/airflow.md](../skipper-core/references/airflow.md)
+- [references/scientific-geospatial.md](../skipper-core/references/scientific-geospatial.md)
+- [references/terraform.md](../skipper-core/references/terraform.md)
+- [references/kubernetes.md](../skipper-core/references/kubernetes.md)
+- [references/ci-cd.md](../skipper-core/references/ci-cd.md)
+- [references/databases-migrations.md](../skipper-core/references/databases-migrations.md)
+- [references/data-pipelines-contracts.md](../skipper-core/references/data-pipelines-contracts.md)
+- [references/observability-recovery.md](../skipper-core/references/observability-recovery.md)
+- [references/security.md](../skipper-core/references/security.md)
 
 Do not load inactive stack references. When repository policy conflicts with a default in these references, preserve the repository contract unless it is the source of the lesson's problem or violates an explicit requirement or safety invariant.
 

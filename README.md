@@ -9,6 +9,7 @@ Modular macOS development environment setup with interactive multi-select picker
 ./init_macos.sh --all              # Install all categories
 ./init_macos.sh --category core    # Install one category
 ./init_macos.sh --category zed     # Install Zed only
+./init_macos.sh --force --all      # Overwrite installed Pi skills and extensions
 ./init_macos.sh --dry-run          # Preview changes without modifying your system
 ./init_macos.sh --help             # Show all options
 ```
@@ -43,7 +44,7 @@ Each skill is a directory containing a `SKILL.md` (plus optional `references/`, 
 ./pi-skills/setup.sh skipper-review        # install it and its required skills
 ./pi-skills/setup.sh --list                # show availability and install status
 ./pi-skills/setup.sh --all --dry-run       # preview all, change nothing
-./pi-skills/setup.sh --all --force         # also replace copies you edited locally
+./pi-skills/setup.sh --all --force         # overwrite every installed skill copy
 ```
 
 Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Selected skills automatically include their dependencies. The installer records the installed version so reruns can apply repository updates without overwriting later local edits. Or install through the main script:
@@ -97,7 +98,7 @@ Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-acces
 ./pi-extensions/setup.sh mini-agents       # install it + required pi-web-access
 ./pi-extensions/setup.sh --list            # show availability and install status
 ./pi-extensions/setup.sh --all --dry-run   # preview all, change nothing
-./pi-extensions/setup.sh --all --force     # also replace copies you edited locally
+./pi-extensions/setup.sh --all --force     # overwrite every installed extension copy
 ```
 
 Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:

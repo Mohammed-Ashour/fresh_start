@@ -17,11 +17,16 @@ else
 fi
 
 ui_confirm() {
-    local prompt="$1" answer
-    printf "%s [Y/n] " "$prompt"
+    local prompt="$1" default="${2:-Y}" answer
+    if [[ "$default" == Y ]]; then
+        printf "%s [Y/n] " "$prompt"
+    else
+        printf "%s [y/N] " "$prompt"
+    fi
     read -r answer || return 1
     case "$answer" in
-        ""|y|Y|yes|YES) return 0 ;;
+        y|Y|yes|YES) return 0 ;;
+        "") [[ "$default" == Y ]] ;;
         *) return 1 ;;
     esac
 }

@@ -11,6 +11,7 @@
 #   ./init_macos.sh --all              # Install everything
 #   ./init_macos.sh --category <name>  # Install specific category
 #   ./init_macos.sh --dry-run          # Show what would be done
+#   ./init_macos.sh --force --all      # Overwrite installed Pi items
 #
 # Categories:
 #   core, dev-tools, zed, productivity, kubernetes, cli-tools, pi-extensions, pi-skills
@@ -38,6 +39,7 @@ SKIPPED_PACKAGES=()
 
 # Options
 DRY_RUN=false
+FORCE=false
 CATEGORY=""
 INSTALL_ALL=false
 
@@ -50,6 +52,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --all)
             INSTALL_ALL=true
+            shift
+            ;;
+        --force)
+            FORCE=true
             shift
             ;;
         --category)
@@ -67,6 +73,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --dry-run            Show what would be done without making changes"
             echo "  --all                Install every category without opening the picker"
             echo "  --category <name>    Install specific category"
+            echo "  --force              Overwrite selected installed Pi skills and extensions"
             echo "  --help               Show this help message"
             echo ""
             echo "Categories:"
@@ -76,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             echo "  productivity   - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
             echo "  kubernetes     - Docker, kubectl, Helm, Minikube, K9s"
             echo "  cli-tools      - bat, eza, ripgrep, zellij, lazydocker"
-            echo "  pi-extensions  - Pi extensions + LazyPi web access"
+            echo "  pi-extensions  - Pi extensions + pi web access"
             echo "  pi-skills      - Pi agent skills (review, ponytail, agdr, ...)"
             exit 0
             ;;
@@ -654,6 +661,9 @@ setup_pi_extensions() {
     if [[ "$DRY_RUN" == "true" ]]; then
         args+=("--dry-run")
     fi
+    if [[ "$FORCE" == "true" ]]; then
+        args+=("--force")
+    fi
 
     if [[ "$INTERACTIVE_MODE" != "true" ]]; then
         args+=("--all")
@@ -689,6 +699,9 @@ setup_pi_skills() {
 
     if [[ "$DRY_RUN" == "true" ]]; then
         args+=("--dry-run")
+    fi
+    if [[ "$FORCE" == "true" ]]; then
+        args+=("--force")
     fi
 
     if [[ "$INTERACTIVE_MODE" != "true" ]]; then

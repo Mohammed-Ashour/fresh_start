@@ -11,7 +11,7 @@
 #   ./setup.sh humanizer grill-me # install only the named skills
 #   ./setup.sh --list             # show available skills and their status
 #   ./setup.sh --dry-run          # show what would change
-#   ./setup.sh --force            # also replace installed copies with local changes
+#   ./setup.sh --force            # overwrite selected installed copies
 
 set -euo pipefail
 
@@ -31,6 +31,7 @@ DRY_RUN=false
 FORCE=false
 LIST=false
 ALL=false
+PICKED_INTERACTIVELY=false
 SELECTED=()
 
 usage() {
@@ -44,7 +45,7 @@ Options:
   --all        Install every skill
   --list       List available skills and their install status
   --dry-run    Show what would change without changing anything
-  --force      Replace installed skills that have local changes
+  --force      Overwrite selected installed skills, including current copies
   -h, --help   Show this help
 
 Examples:
@@ -146,17 +147,19 @@ contains() {
 
 skill_dependencies() {
     case "$1" in
-        skipper-review) echo "science-pr-review show-me unslop" ;;
+        skipper-review) echo "science-pr-review show-me unslop skipper-core" ;;
         skipper-review-deep) echo "skipper-review" ;;
         science-pr-review) echo "skipper-review" ;;
+        skipper-audit|skipper-implement|skipper-teach|skipper-test-coverage) echo "skipper-core" ;;
     esac
 }
 
 dependency_note() {
     case "$1" in
-        skipper-review) echo "includes science-pr-review, show-me, unslop" ;;
+        skipper-review) echo "includes science-pr-review, show-me, unslop, skipper-core" ;;
         skipper-review-deep) echo "includes skipper-review and its dependencies" ;;
         science-pr-review) echo "includes skipper-review and its dependencies" ;;
+        skipper-audit|skipper-implement|skipper-teach|skipper-test-coverage) echo "includes skipper-core" ;;
     esac
 }
 
@@ -238,6 +241,7 @@ if [[ "$ALL" == false && ${#SELECTED[@]} -eq 0 ]]; then
     done
     ui_pick || exit 2
     SELECTED=("${PICKER_SELECTED[@]}")
+    PICKED_INTERACTIVELY=true
 fi
 
 if [[ "$ALL" == true ]]; then
@@ -256,6 +260,16 @@ else
     for name in "${SELECTED[@]}"; do add_with_dependencies "$name"; done
 fi
 
+if [[ "$PICKED_INTERACTIVELY" == true && "$FORCE" == false ]]; then
+    has_installed=false
+    for name in "${TODO[@]}"; do
+        [[ "$(state_of "$name")" != new ]] && has_installed=true && break
+    done
+    if [[ "$has_installed" == true ]]; then
+        ui_confirm "Overwrite installed copies in this selection?" N && FORCE=true
+    fi
+fi
+
 if [[ "$DRY_RUN" == true ]]; then
     echo "${BOLD}Agent skills${NC} → $TARGET ${YELLOW}(dry run: nothing will change)${NC}"
 else
@@ -264,10 +278,10 @@ fi
 echo
 [[ "$DRY_RUN" == false ]] && mkdir -p "$TARGET"
 
-installed=0; updated=0; current=0; kept=0
+installed=0; updated=0; overwritten=0; current=0; kept=0
 for name in "${TODO[@]}"; do
     state="$(state_of "$name")"
-    if [[ "$state" == current ]]; then
+    if [[ "$state" == current && "$FORCE" == false ]]; then
         row "${GREEN}✓${NC}" "$name" "$DIM" "up to date" "$(describe "$name")"
         [[ "$DRY_RUN" == false ]] && record_hash "$name"
         current=$((current + 1))
@@ -286,23 +300,26 @@ for name in "${TODO[@]}"; do
     if [[ "$state" == new ]]; then
         row "${GREEN}+${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would install" || echo installed)" "$(describe "$name")"
         installed=$((installed + 1))
-    else
+    elif [[ "$state" == update ]]; then
         row "${GREEN}↑${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would update" || echo updated)" "$(describe "$name")"
         updated=$((updated + 1))
+    else
+        row "${GREEN}↻${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would overwrite" || echo overwritten)" "$(describe "$name")"
+        overwritten=$((overwritten + 1))
     fi
 done
 
 echo
 if [[ "$DRY_RUN" == true ]]; then
-    summary="$installed to install, $updated to update, $current up to date"
+    summary="$installed to install, $updated to update, $overwritten to overwrite, $current up to date"
 else
-    summary="$installed installed, $updated updated, $current up to date"
+    summary="$installed installed, $updated updated, $overwritten overwritten, $current up to date"
 fi
 [[ $kept -gt 0 ]] && summary="$summary, ${YELLOW}$kept kept with local changes${NC} (rerun with --force to replace)"
 if [[ "$DRY_RUN" == true ]]; then
     echo "${BOLD}Dry run:${NC} $summary."
 else
     echo "${BOLD}Done:${NC} $summary."
-    [[ $((installed + updated)) -gt 0 ]] && echo "Next: run /reload in pi, or restart it."
+    [[ $((installed + updated + overwritten)) -gt 0 ]] && echo "Next: run /reload in pi, or restart it."
 fi
 exit 0

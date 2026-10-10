@@ -26,18 +26,18 @@ A familiar or general design is not automatically better. Ask for a larger desig
 
 ## Engineering references
 
-For a non-trivial review, first read [references/core-principles.md](references/core-principles.md). Then read only the references that match the changed stack:
+For a non-trivial review, first read [references/core-principles.md](../skipper-core/references/core-principles.md). Then read only the references that match the changed stack:
 
-- [references/python.md](references/python.md)
-- [references/airflow.md](references/airflow.md)
-- [references/scientific-geospatial.md](references/scientific-geospatial.md)
-- [references/terraform.md](references/terraform.md)
-- [references/kubernetes.md](references/kubernetes.md)
-- [references/ci-cd.md](references/ci-cd.md)
-- [references/databases-migrations.md](references/databases-migrations.md)
-- [references/data-pipelines-contracts.md](references/data-pipelines-contracts.md)
-- [references/observability-recovery.md](references/observability-recovery.md)
-- [references/security.md](references/security.md)
+- [references/python.md](../skipper-core/references/python.md)
+- [references/airflow.md](../skipper-core/references/airflow.md)
+- [references/scientific-geospatial.md](../skipper-core/references/scientific-geospatial.md)
+- [references/terraform.md](../skipper-core/references/terraform.md)
+- [references/kubernetes.md](../skipper-core/references/kubernetes.md)
+- [references/ci-cd.md](../skipper-core/references/ci-cd.md)
+- [references/databases-migrations.md](../skipper-core/references/databases-migrations.md)
+- [references/data-pipelines-contracts.md](../skipper-core/references/data-pipelines-contracts.md)
+- [references/observability-recovery.md](../skipper-core/references/observability-recovery.md)
+- [references/security.md](../skipper-core/references/security.md)
 
 Repository policy wins when it conflicts with a default in these references, unless that policy causes the defect or breaks an explicit requirement or safety invariant.
 

@@ -9,18 +9,18 @@ Operate as a Skipper-family reviewer: compact, explicit, evidence-based, and ris
 
 ## Engineering references
 
-Treat the bundled references as canonical policy for the active coverage boundary. Read [references/core-principles.md](references/core-principles.md) before non-trivial coverage reviews, then read only the stack references needed for a live decision:
+Treat the bundled references as canonical policy for the active coverage boundary. Read [references/core-principles.md](../skipper-core/references/core-principles.md) before non-trivial coverage reviews, then read only the stack references needed for a live decision:
 
-- [references/python.md](references/python.md)
-- [references/airflow.md](references/airflow.md)
-- [references/scientific-geospatial.md](references/scientific-geospatial.md)
-- [references/terraform.md](references/terraform.md)
-- [references/kubernetes.md](references/kubernetes.md)
-- [references/ci-cd.md](references/ci-cd.md)
-- [references/databases-migrations.md](references/databases-migrations.md)
-- [references/data-pipelines-contracts.md](references/data-pipelines-contracts.md)
-- [references/observability-recovery.md](references/observability-recovery.md)
-- [references/security.md](references/security.md)
+- [references/python.md](../skipper-core/references/python.md)
+- [references/airflow.md](../skipper-core/references/airflow.md)
+- [references/scientific-geospatial.md](../skipper-core/references/scientific-geospatial.md)
+- [references/terraform.md](../skipper-core/references/terraform.md)
+- [references/kubernetes.md](../skipper-core/references/kubernetes.md)
+- [references/ci-cd.md](../skipper-core/references/ci-cd.md)
+- [references/databases-migrations.md](../skipper-core/references/databases-migrations.md)
+- [references/data-pipelines-contracts.md](../skipper-core/references/data-pipelines-contracts.md)
+- [references/observability-recovery.md](../skipper-core/references/observability-recovery.md)
+- [references/security.md](../skipper-core/references/security.md)
 
 Do not load inactive stack references. When repository policy conflicts with a default in these references, preserve the repository contract unless it is the source of the coverage gap or violates an explicit requirement or safety invariant.
 

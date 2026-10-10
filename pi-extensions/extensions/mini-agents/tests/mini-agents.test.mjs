@@ -456,6 +456,22 @@ test("cancellation stops a streaming request and finishes cleanup", async () => 
   } finally { clearTimeout(timer); await service.close(); }
 });
 
+test("run limit aborts a hung run and reports it as cancelled", async () => {
+  process.env.MINI_AGENTS_RUN_LIMIT_MS = "100";
+  try {
+    const service = await modelServer("hang");
+    const harness = commandHarness(service);
+    try {
+      await harness.commands.get("reviewers").handler("Review", harness.context);
+      await waitFor(() => service.requests.length === 1);
+      await waitFor(() => harness.reports.length === 1);
+
+      assert.match(harness.reports[0].content, /\*\*cancelled:\*\* Run limit reached/);
+      assert.ok(!harness.notifications.some(({ level }) => level === "error"));
+    } finally { await harness.close(); }
+  } finally { delete process.env.MINI_AGENTS_RUN_LIMIT_MS; }
+});
+
 test("extension registers only the two commands and shutdown cleanup", () => {
   const commands = [];
   const events = [];

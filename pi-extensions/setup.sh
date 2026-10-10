@@ -11,7 +11,7 @@
 #   ./setup.sh mini-agents        # install only the named extensions
 #   ./setup.sh --list             # show available extensions and their status
 #   ./setup.sh --dry-run          # show what would change
-#   ./setup.sh --force            # also replace installed copies with local changes
+#   ./setup.sh --force            # overwrite selected installed copies
 
 set -euo pipefail
 
@@ -33,6 +33,7 @@ DRY_RUN=false
 FORCE=false
 LIST=false
 ALL=false
+PICKED_INTERACTIVELY=false
 SELECTED=()
 
 usage() {
@@ -46,7 +47,7 @@ Options:
   --all        Install every extension plus $PACKAGE
   --list       List available extensions and their install status
   --dry-run    Show what would change without changing anything
-  --force      Replace installed extensions that have local changes
+  --force      Overwrite selected installed extensions, including current copies
   -h, --help   Show this help
 
 Examples:
@@ -58,18 +59,7 @@ EOF
 }
 
 describe() {
-    case "$1" in
-        ask-questions.ts) echo "Multi-question picker tool" ;;
-        context-usage.ts) echo "Context usage in the footer" ;;
-        diff-review) echo "/diff-review: review a git diff in the TUI" ;;
-        diff-review-web) echo "/diff-review-web: review a git diff in the browser" ;;
-        exit-command.ts) echo "/exit as an alias for /quit" ;;
-        mini-agents) echo "/reviewers and /researchers; includes pi-web-access" ;;
-        permission-gate.ts) echo "Blocks dangerous commands (modes in permissions.json)" ;;
-        permissions.json) echo "Permission modes for permission-gate (default: safeMode)" ;;
-        share-local.ts) echo "/share-local: export the session to HTML" ;;
-        *) echo "" ;;
-    esac
+    awk -F '\t' -v name="$1" '$1 == name { print $2; exit }' "$SETUP_DIR/manifest.tsv"
 }
 
 hash_stream() {
@@ -202,6 +192,7 @@ if [[ "$ALL" == false && ${#SELECTED[@]} -eq 0 ]]; then
     done
     ui_pick || exit 2
     SELECTED=("${PICKER_SELECTED[@]}")
+    PICKED_INTERACTIVELY=true
 fi
 
 INSTALL_PACKAGE=false
@@ -222,6 +213,16 @@ else
     TODO=("${SELECTED[@]}")
 fi
 
+if [[ "$PICKED_INTERACTIVELY" == true && "$FORCE" == false ]]; then
+    has_installed=false
+    for name in "${TODO[@]}"; do
+        [[ "$(state_of "$name")" != new ]] && has_installed=true && break
+    done
+    if [[ "$has_installed" == true ]]; then
+        ui_confirm "Overwrite installed copies in this selection?" N && FORCE=true
+    fi
+fi
+
 if [[ ! -d "$PI_DIR" ]]; then
     echo "${YELLOW}Pi agent directory not found: $PI_DIR${NC}" >&2
     echo "Install pi first (https://pi.dev), then rerun this script." >&2
@@ -236,10 +237,10 @@ fi
 echo
 [[ "$DRY_RUN" == false ]] && mkdir -p "$TARGET"
 
-installed=0; updated=0; current=0; kept=0
+installed=0; updated=0; overwritten=0; current=0; kept=0
 for name in "${TODO[@]}"; do
     state="$(state_of "$name")"
-    if [[ "$state" == current ]]; then
+    if [[ "$state" == current && "$FORCE" == false ]]; then
         row "${GREEN}✓${NC}" "$name" "$DIM" "up to date" "$(describe "$name")"
         [[ "$DRY_RUN" == false ]] && record_hash "$name"
         current=$((current + 1))
@@ -258,9 +259,12 @@ for name in "${TODO[@]}"; do
     if [[ "$state" == new ]]; then
         row "${GREEN}+${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would install" || echo installed)" "$(describe "$name")"
         installed=$((installed + 1))
-    else
+    elif [[ "$state" == update ]]; then
         row "${GREEN}↑${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would update" || echo updated)" "$(describe "$name")"
         updated=$((updated + 1))
+    else
+        row "${GREEN}↻${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would overwrite" || echo overwritten)" "$(describe "$name")"
+        overwritten=$((overwritten + 1))
     fi
 done
 
@@ -291,15 +295,15 @@ for name in "${TODO[@]}"; do
 done
 
 if [[ "$DRY_RUN" == true ]]; then
-    summary="$installed to install, $updated to update, $current up to date"
+    summary="$installed to install, $updated to update, $overwritten to overwrite, $current up to date"
 else
-    summary="$installed installed, $updated updated, $current up to date"
+    summary="$installed installed, $updated updated, $overwritten overwritten, $current up to date"
 fi
 [[ $kept -gt 0 ]] && summary="$summary, ${YELLOW}$kept kept with local changes${NC} (rerun with --force to replace)"
 if [[ "$DRY_RUN" == true ]]; then
     echo "${BOLD}Dry run:${NC} $summary."
 else
     echo "${BOLD}Done:${NC} $summary."
-    [[ $((installed + updated)) -gt 0 ]] && echo "Next: run /reload in pi, or restart it."
+    [[ $((installed + updated + overwritten)) -gt 0 ]] && echo "Next: run /reload in pi, or restart it."
 fi
 exit 0

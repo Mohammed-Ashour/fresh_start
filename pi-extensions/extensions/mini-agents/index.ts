@@ -42,6 +42,12 @@ interface Run {
 }
 const exec = promisify(execFile);
 const RUN_LIMIT_MS = 30 * 60_000;
+/** Per-run timeout, overridable for tests. */
+export const runLimitMs = (): number => {
+  const raw = process.env.MINI_AGENTS_RUN_LIMIT_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : RUN_LIMIT_MS;
+};
 const LABEL: Record<Mode, string> = { reviewers: "Review", researchers: "Research" };
 const ICON: Record<State, string> = { starting: "○", running: "●", done: "✓", failed: "✗", cancelled: "■" };
 const LOG_LIMIT = 500;
@@ -286,7 +292,8 @@ export function formatReport(title: string, task: string, jobs: Job[], notes: st
     const status = job.state === "done" ? "" : `**${job.state}:** ${job.activity}\n\n`;
     return `${heading}${status}${job.output || "_No output returned._"}`;
   });
-  return [`## ${title}`, `> ${task}`, ...body, `---\n${notes.join(" · ")}`].join("\n\n");
+  const quotedTask = task.split("\n").map((line) => `> ${line}`).join("\n");
+  return [`## ${title}`, quotedTask, ...body, `---\n${notes.join(" · ")}`].join("\n\n");
 }
 
 /** Read Git changes through fixed commands without exposing a shell. */
@@ -547,7 +554,7 @@ export default function miniAgents(pi: ExtensionAPI): void {
     const directory = mkdtempSync(join(getAgentDir(), "mini-agents-runs", `${run.mode}-`));
     const reportPath = join(directory, "results.md");
     const { controller, jobs } = run;
-    const timer = setTimeout(() => controller.abort("30-minute run limit reached"), RUN_LIMIT_MS);
+    const timer = setTimeout(() => controller.abort("Run limit reached"), runLimitMs());
     let pr: PrSnapshot | undefined;
     try {
       const runtime = await ModelRuntime.create();

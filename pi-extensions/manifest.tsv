@@ -1,0 +1,10 @@
+name	description
+ask-questions.ts	Multi-question picker tool
+context-usage.ts	Context usage in the footer
+diff-review	/diff-review: review a git diff in the TUI
+diff-review-web	/diff-review-web: review a git diff in the browser
+exit-command.ts	/exit as an alias for /quit
+mini-agents	/reviewers and /researchers background subagents
+permission-gate.ts	Blocks dangerous commands (modes in permissions.json)
+permissions.json	Permission modes for permission-gate (default: safeMode)
+share-local.ts	/share-local: export the session to HTML
