@@ -6,7 +6,8 @@
 # into the pi extensions directory, then installs the npm:pi-web-access package.
 #
 # Usage:
-#   ./setup.sh                    # install all extensions
+#   ./setup.sh                    # choose extensions interactively
+#   ./setup.sh --all              # install all extensions
 #   ./setup.sh mini-agents        # install only the named extensions
 #   ./setup.sh --list             # show available extensions and their status
 #   ./setup.sh --dry-run          # show what would change
@@ -16,9 +17,11 @@ set -euo pipefail
 
 PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 TARGET="$PI_DIR/extensions"
-SOURCE="$(cd "$(dirname "$0")" && pwd)/extensions"
+SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE="$SETUP_DIR/extensions"
 PACKAGE="npm:pi-web-access"
 STATE_FILE="$TARGET/.fresh-start-state"
+source "$SETUP_DIR/../lib/installer-ui.sh"
 
 if [[ -t 1 ]]; then
     GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; RED=$'\033[0;31m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; NC=$'\033[0m'
@@ -29,6 +32,7 @@ fi
 DRY_RUN=false
 FORCE=false
 LIST=false
+ALL=false
 SELECTED=()
 
 usage() {
@@ -36,18 +40,20 @@ usage() {
 Usage: $(basename "$0") [options] [name ...]
 
 Install pi extensions into $TARGET.
-With no names, installs every extension plus $PACKAGE.
+With no arguments, opens an interactive picker. Automation must use --all or names.
 
 Options:
+  --all        Install every extension plus $PACKAGE
   --list       List available extensions and their install status
   --dry-run    Show what would change without changing anything
   --force      Replace installed extensions that have local changes
   -h, --help   Show this help
 
 Examples:
-  $(basename "$0")                       # install everything
-  $(basename "$0") mini-agents diff-review
-  $(basename "$0") --dry-run --force
+  $(basename "$0")                       # choose extensions interactively
+  $(basename "$0") --all                 # install everything
+  $(basename "$0") mini-agents           # also installs pi-web-access
+  $(basename "$0") --all --dry-run
 EOF
 }
 
@@ -58,7 +64,7 @@ describe() {
         diff-review) echo "/diff-review: review a git diff in the TUI" ;;
         diff-review-web) echo "/diff-review-web: review a git diff in the browser" ;;
         exit-command.ts) echo "/exit as an alias for /quit" ;;
-        mini-agents) echo "/reviewers and /researchers background subagents" ;;
+        mini-agents) echo "/reviewers and /researchers; includes pi-web-access" ;;
         permission-gate.ts) echo "Blocks dangerous commands (modes in permissions.json)" ;;
         permissions.json) echo "Permission modes for permission-gate (default: safeMode)" ;;
         share-local.ts) echo "/share-local: export the session to HTML" ;;
@@ -132,6 +138,7 @@ row() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --all) ALL=true ;;
         --dry-run) DRY_RUN=true ;;
         --force) FORCE=true ;;
         --list) LIST=true ;;
@@ -169,7 +176,39 @@ if [[ "$LIST" == true ]]; then
     exit 0
 fi
 
-if [[ ${#SELECTED[@]} -gt 0 ]]; then
+if [[ "$ALL" == true && ${#SELECTED[@]} -gt 0 ]]; then
+    echo "${RED}Use --all or named extensions, not both.${NC}" >&2
+    exit 1
+fi
+
+if [[ "$ALL" == false && ${#SELECTED[@]} -eq 0 ]]; then
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        echo "${RED}No extensions selected.${NC} Use --all or pass extension names when running non-interactively." >&2
+        exit 2
+    fi
+    PICKER_TITLE="Pi extensions"
+    PICKER_VALUES=("${AVAILABLE[@]}")
+    PICKER_LABELS=("${AVAILABLE[@]}")
+    PICKER_DETAILS=()
+    for name in "${AVAILABLE[@]}"; do
+        state="$(state_of "$name")"
+        case "$state" in
+            new) status="not installed" ;;
+            current) status="up to date" ;;
+            update) status="update available" ;;
+            changed) status="local changes" ;;
+        esac
+        PICKER_DETAILS+=("$status · $(describe "$name")")
+    done
+    ui_pick || exit 2
+    SELECTED=("${PICKER_SELECTED[@]}")
+fi
+
+INSTALL_PACKAGE=false
+if [[ "$ALL" == true ]]; then
+    TODO=("${AVAILABLE[@]}")
+    INSTALL_PACKAGE=true
+else
     for name in "${SELECTED[@]}"; do
         found=false
         for candidate in "${AVAILABLE[@]}"; do [[ "$candidate" == "$name" ]] && found=true; done
@@ -178,10 +217,9 @@ if [[ ${#SELECTED[@]} -gt 0 ]]; then
             echo "Available: ${AVAILABLE[*]}" >&2
             exit 1
         fi
+        [[ "$name" == mini-agents ]] && INSTALL_PACKAGE=true
     done
     TODO=("${SELECTED[@]}")
-else
-    TODO=("${AVAILABLE[@]}")
 fi
 
 if [[ ! -d "$PI_DIR" ]]; then
@@ -227,7 +265,7 @@ for name in "${TODO[@]}"; do
 done
 
 echo
-if [[ ${#SELECTED[@]} -eq 0 ]]; then
+if [[ "$INSTALL_PACKAGE" == true ]]; then
     echo "${BOLD}Pi package${NC}"
     if ! command -v pi >/dev/null 2>&1; then
         row "${YELLOW}!${NC}" "$PACKAGE" "$YELLOW" "skipped: pi not on PATH" "web search for pi and mini-agents"

@@ -1,11 +1,11 @@
 # Fresh macOS Setup
 
-Modular macOS development environment setup with an interactive menu, guided install prompts, per-category installs, and a real dry-run mode.
+Modular macOS development environment setup with interactive multi-select pickers, guided prompts, per-category installs, and a real dry-run mode.
 
 ## Usage
 
 ```bash
-./init_macos.sh                    # Interactive guided menu
+./init_macos.sh                    # Choose categories in an interactive picker
 ./init_macos.sh --all              # Install all categories
 ./init_macos.sh --category core    # Install one category
 ./init_macos.sh --category zed     # Install Zed only
@@ -16,6 +16,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 ### Notes
 
 - `--dry-run` is non-destructive and prints the commands that would run.
+- Without a TTY, pass `--all`, `--category <name>`, or explicit Pi item names.
 - Homebrew setup supports both Apple Silicon (`/opt/homebrew`) and Intel (`/usr/local`) installs.
 - You can combine `--dry-run` with `--all` or `--category <name>`.
 
@@ -37,11 +38,12 @@ Modular macOS development environment setup with an interactive menu, guided ins
 Each skill is a directory containing a `SKILL.md` (plus optional `references/`, `agents/`, `scripts/` assets) copied into `~/.agents/skills/`:
 
 ```bash
-./pi-skills/setup.sh                       # install all skills
+./pi-skills/setup.sh                       # choose skills interactively
+./pi-skills/setup.sh --all                 # install all skills
 ./pi-skills/setup.sh skipper-review        # install it and its required skills
-./pi-skills/setup.sh --list                # what's available and what's installed
-./pi-skills/setup.sh --dry-run             # preview, change nothing
-./pi-skills/setup.sh --force               # also replace copies you edited locally
+./pi-skills/setup.sh --list                # show availability and install status
+./pi-skills/setup.sh --all --dry-run       # preview all, change nothing
+./pi-skills/setup.sh --all --force         # also replace copies you edited locally
 ```
 
 Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Selected skills automatically include their dependencies. The installer records the installed version so reruns can apply repository updates without overwriting later local edits. Or install through the main script:
@@ -90,11 +92,12 @@ Each skill gets one status line: installed, updated, up to date, or kept because
 Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-access` package is installed through `pi`:
 
 ```bash
-./pi-extensions/setup.sh                   # install all extensions + pi-web-access
-./pi-extensions/setup.sh mini-agents       # install only these
-./pi-extensions/setup.sh --list            # what's available and what's installed
-./pi-extensions/setup.sh --dry-run         # preview, change nothing
-./pi-extensions/setup.sh --force           # also replace copies you edited locally
+./pi-extensions/setup.sh                   # choose extensions interactively
+./pi-extensions/setup.sh --all             # install all extensions + pi-web-access
+./pi-extensions/setup.sh mini-agents       # install it + required pi-web-access
+./pi-extensions/setup.sh --list            # show availability and install status
+./pi-extensions/setup.sh --all --dry-run   # preview all, change nothing
+./pi-extensions/setup.sh --all --force     # also replace copies you edited locally
 ```
 
 Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:

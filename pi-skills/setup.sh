@@ -6,7 +6,8 @@
 # agents/, scripts/) and is copied as-is into the skills directory.
 #
 # Usage:
-#   ./setup.sh                    # install all skills
+#   ./setup.sh                    # choose skills interactively
+#   ./setup.sh --all              # install all skills
 #   ./setup.sh humanizer grill-me # install only the named skills
 #   ./setup.sh --list             # show available skills and their status
 #   ./setup.sh --dry-run          # show what would change
@@ -15,8 +16,10 @@
 set -euo pipefail
 
 TARGET="${PI_SKILLS_DIR:-$HOME/.agents/skills}"
-SOURCE="$(cd "$(dirname "$0")" && pwd)/skills"
+SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE="$SETUP_DIR/skills"
 STATE_FILE="$TARGET/.fresh-start-state"
+source "$SETUP_DIR/../lib/installer-ui.sh"
 
 if [[ -t 1 ]]; then
     GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; RED=$'\033[0;31m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; NC=$'\033[0m'
@@ -27,6 +30,7 @@ fi
 DRY_RUN=false
 FORCE=false
 LIST=false
+ALL=false
 SELECTED=()
 
 usage() {
@@ -34,18 +38,20 @@ usage() {
 Usage: $(basename "$0") [options] [name ...]
 
 Install agent skills into $TARGET.
-With no names, installs every skill.
+With no arguments, opens an interactive picker. Automation must use --all or names.
 
 Options:
+  --all        Install every skill
   --list       List available skills and their install status
   --dry-run    Show what would change without changing anything
   --force      Replace installed skills that have local changes
   -h, --help   Show this help
 
 Examples:
-  $(basename "$0")                       # install everything
+  $(basename "$0")                       # choose skills interactively
+  $(basename "$0") --all                 # install every skill
   $(basename "$0") humanizer grill-me
-  $(basename "$0") --dry-run --force
+  $(basename "$0") --all --dry-run
 EOF
 }
 
@@ -146,6 +152,14 @@ skill_dependencies() {
     esac
 }
 
+dependency_note() {
+    case "$1" in
+        skipper-review) echo "includes science-pr-review, show-me, unslop" ;;
+        skipper-review-deep) echo "includes skipper-review and its dependencies" ;;
+        science-pr-review) echo "includes skipper-review and its dependencies" ;;
+    esac
+}
+
 add_with_dependencies() {
     local name="$1" dependency
     contains "$name" "${TODO[@]:-}" && return
@@ -161,6 +175,7 @@ add_with_dependencies() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --all) ALL=true ;;
         --dry-run) DRY_RUN=true ;;
         --force) FORCE=true ;;
         --list) LIST=true ;;
@@ -196,7 +211,38 @@ if [[ "$LIST" == true ]]; then
     exit 0
 fi
 
-if [[ ${#SELECTED[@]} -gt 0 ]]; then
+if [[ "$ALL" == true && ${#SELECTED[@]} -gt 0 ]]; then
+    echo "${RED}Use --all or named skills, not both.${NC}" >&2
+    exit 1
+fi
+
+if [[ "$ALL" == false && ${#SELECTED[@]} -eq 0 ]]; then
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        echo "${RED}No skills selected.${NC} Use --all or pass skill names when running non-interactively." >&2
+        exit 2
+    fi
+    PICKER_TITLE="Pi skills"
+    PICKER_VALUES=("${AVAILABLE[@]}")
+    PICKER_LABELS=("${AVAILABLE[@]}")
+    PICKER_DETAILS=()
+    for name in "${AVAILABLE[@]}"; do
+        state="$(state_of "$name")"
+        case "$state" in
+            new) status="not installed" ;;
+            current) status="up to date" ;;
+            update) status="update available" ;;
+            changed) status="local changes" ;;
+        esac
+        note="$(dependency_note "$name")"
+        PICKER_DETAILS+=("$status · ${note:-$(describe "$name")}")
+    done
+    ui_pick || exit 2
+    SELECTED=("${PICKER_SELECTED[@]}")
+fi
+
+if [[ "$ALL" == true ]]; then
+    TODO=("${AVAILABLE[@]}")
+else
     for name in "${SELECTED[@]}"; do
         found=false
         for candidate in "${AVAILABLE[@]}"; do [[ "$candidate" == "$name" ]] && found=true; done
@@ -208,8 +254,6 @@ if [[ ${#SELECTED[@]} -gt 0 ]]; then
     done
     TODO=()
     for name in "${SELECTED[@]}"; do add_with_dependencies "$name"; done
-else
-    TODO=("${AVAILABLE[@]}")
 fi
 
 if [[ "$DRY_RUN" == true ]]; then
