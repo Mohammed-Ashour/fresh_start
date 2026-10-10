@@ -1,14 +1,15 @@
 # Fresh macOS Setup
 
-Modular macOS development environment setup with an interactive menu, guided install prompts, per-category installs, and a real dry-run mode.
+Modular macOS development environment setup with interactive multi-select pickers, guided prompts, per-category installs, and a real dry-run mode.
 
 ## Usage
 
 ```bash
-./init_macos.sh                    # Interactive guided menu
+./init_macos.sh                    # Choose categories in an interactive picker
 ./init_macos.sh --all              # Install all categories
 ./init_macos.sh --category core    # Install one category
 ./init_macos.sh --category zed     # Install Zed only
+./init_macos.sh --force --all      # Overwrite installed Pi skills and extensions
 ./init_macos.sh --dry-run          # Preview changes without modifying your system
 ./init_macos.sh --help             # Show all options
 ```
@@ -16,6 +17,7 @@ Modular macOS development environment setup with an interactive menu, guided ins
 ### Notes
 
 - `--dry-run` is non-destructive and prints the commands that would run.
+- Without a TTY, pass `--all`, `--category <name>`, or explicit Pi item names.
 - Homebrew setup supports both Apple Silicon (`/opt/homebrew`) and Intel (`/usr/local`) installs.
 - You can combine `--dry-run` with `--all` or `--category <name>`.
 
@@ -29,26 +31,23 @@ Modular macOS development environment setup with an interactive menu, guided ins
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
-| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, pi-web-access |
-| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, security-best-practices, simplify, unit-test-aaa |
+| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, mini-agents, pi-web-access |
+| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
 
 ## Pi Skills
 
-Install all Pi agent skills directly. Each skill is a directory containing a `SKILL.md` (plus optional `references/`, `agents/`, `scripts/` assets) copied into `~/.agents/skills/`. Running without flags installs any missing skills:
+Each skill is a directory containing a `SKILL.md` (plus optional `references/`, `agents/`, `scripts/` assets) copied into `~/.agents/skills/`:
 
 ```bash
-./pi-skills/setup.sh
+./pi-skills/setup.sh                       # choose skills interactively
+./pi-skills/setup.sh --all                 # install all skills
+./pi-skills/setup.sh skipper-review        # install it and its required skills
+./pi-skills/setup.sh --list                # show availability and install status
+./pi-skills/setup.sh --all --dry-run       # preview all, change nothing
+./pi-skills/setup.sh --all --force         # overwrite every installed skill copy
 ```
 
-Useful options:
-
-```bash
-./pi-skills/setup.sh --dry-run
-./pi-skills/setup.sh --force
-./pi-skills/setup.sh --help
-```
-
-Or install them through the main setup script:
+Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Selected skills automatically include their dependencies. The installer records the installed version so reruns can apply repository updates without overwriting later local edits. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-skills
@@ -76,27 +75,33 @@ Or install them through the main setup script:
 | `pr-splitter` | Split oversized PRs into smaller scoped PRs |
 | `review` | Correctness-focused code review |
 | `review-story` | Concise narrative walkthrough of PR changes |
+| `science-pr-review` | Stage 0-5 science-model lifecycle gate; used by skipper-review on science PRs |
 | `security-best-practices` | Language/framework security best-practice reviews |
+| `show-me` | Explain a topic visually with diagrams, code sketches, and small HTML artifacts |
 | `simplify` | Review recent changes for reuse, quality, efficiency |
+| `skipper-audit` | Evidence-based health audit of a repo or subsystem |
+| `skipper-implement` | Smallest safe change for Python, Airflow, geospatial, Terraform, k8s, CI/CD |
+| `skipper-review` | Review a PR, diff, branch, or commit for correctness, safety, and complexity |
+| `skipper-review-deep` | Line-by-line deep review, building on skipper-review |
+| `skipper-teach` | One focused offline HTML lesson on a data or platform engineering topic |
+| `skipper-test-coverage` | Behavior-level test coverage assessment with ranked gaps |
 | `unit-test-aaa` | Write pytest tests in Arrange-Act-Assert pattern |
+| `unslop` | Cut AI tells from any writing |
 
 ## Pi Extensions
 
-Install all Pi extensions directly. Running without flags opens an interactive chooser:
+Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-access` package is installed through `pi`:
 
 ```bash
-./pi-extensions/setup.sh
+./pi-extensions/setup.sh                   # choose extensions interactively
+./pi-extensions/setup.sh --all             # install all extensions + pi-web-access
+./pi-extensions/setup.sh mini-agents       # install it + required pi-web-access
+./pi-extensions/setup.sh --list            # show availability and install status
+./pi-extensions/setup.sh --all --dry-run   # preview all, change nothing
+./pi-extensions/setup.sh --all --force     # overwrite every installed extension copy
 ```
 
-Useful options:
-
-```bash
-./pi-extensions/setup.sh --dry-run
-./pi-extensions/setup.sh --force
-./pi-extensions/setup.sh --help
-```
-
-Or install them through the main setup script:
+Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-extensions
@@ -149,6 +154,17 @@ Or install them through the main setup script:
 - `/diff-review-web --cached` reviews staged changes
 - `/diff-review-web main...HEAD` reviews a custom diff range
 - `/diff-review-web-stop` stops the localhost review server
+
+**Mini Agents**
+- `/reviewers <request>` runs a background code review, e.g. `/reviewers skipper review the current PR`
+- `/researchers <question>` runs two background researchers: one gathers sources, one looks for counterevidence
+- your skills drive the work: name the style you want, e.g. "skipper review" or "deep review"
+- PR URL, "current PR", or "PR #n" reviews the committed PR through `gh`, without checking it out
+- reviews and research run concurrently and post results to the chat when done
+- `--context` adds the current conversation as background; agents start fresh by default
+- subcommands: `model`, `peek` (live log), `stop`, `help`, with autocomplete
+- read-only: agents never edit files, run commands, or post to GitHub
+- needs `pi-web-access` for research and an authenticated `gh` for PR reviews; see `pi-extensions/extensions/mini-agents/README.md`
 
 ## After Setup
 

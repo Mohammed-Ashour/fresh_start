@@ -7,10 +7,11 @@
 # Interactive macOS development environment setup with modular components.
 #
 # Usage:
-#   ./init_macos.sh                    # Interactive mode (menu + prompts)
+#   ./init_macos.sh                    # Interactive multi-select + prompts
 #   ./init_macos.sh --all              # Install everything
 #   ./init_macos.sh --category <name>  # Install specific category
 #   ./init_macos.sh --dry-run          # Show what would be done
+#   ./init_macos.sh --force --all      # Overwrite installed Pi items
 #
 # Categories:
 #   core, dev-tools, zed, productivity, kubernetes, cli-tools, pi-extensions, pi-skills
@@ -18,6 +19,9 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib/installer-ui.sh"
 
 # Colors
 RED='\033[0;31m'
@@ -28,22 +32,6 @@ CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
-# Box drawing constants
-BOX_WIDTH=68  # Inner width (excluding border characters)
-
-# Function to print a box line with proper padding
-box_line() {
-    local content="$1"
-    local len=${#content}
-    local padding=$((BOX_WIDTH - len))
-    printf "║ %s%${padding}s ║\n" "$content" ""
-}
-
-# Function to print a separator line
-box_sep() {
-    echo "╠══════════════════════════════════════════════════════════════════════╣"
-}
-
 # Arrays to store installation status
 INSTALLED_PACKAGES=()
 ALREADY_SETUP_PACKAGES=()
@@ -51,6 +39,7 @@ SKIPPED_PACKAGES=()
 
 # Options
 DRY_RUN=false
+FORCE=false
 CATEGORY=""
 INSTALL_ALL=false
 
@@ -65,7 +54,15 @@ while [[ $# -gt 0 ]]; do
             INSTALL_ALL=true
             shift
             ;;
+        --force)
+            FORCE=true
+            shift
+            ;;
         --category)
+            if [[ $# -lt 2 ]]; then
+                echo "--category requires a name" >&2
+                exit 1
+            fi
             CATEGORY="$2"
             shift 2
             ;;
@@ -74,8 +71,9 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --dry-run            Show what would be done without making changes"
-            echo "  --all                Install everything"
+            echo "  --all                Install every category without opening the picker"
             echo "  --category <name>    Install specific category"
+            echo "  --force              Overwrite selected installed Pi skills and extensions"
             echo "  --help               Show this help message"
             echo ""
             echo "Categories:"
@@ -85,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             echo "  productivity   - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
             echo "  kubernetes     - Docker, kubectl, Helm, Minikube, K9s"
             echo "  cli-tools      - bat, eza, ripgrep, zellij, lazydocker"
-            echo "  pi-extensions  - Pi extensions + LazyPi web access"
+            echo "  pi-extensions  - Pi extensions + pi web access"
             echo "  pi-skills      - Pi agent skills (review, ponytail, agdr, ...)"
             exit 0
             ;;
@@ -652,7 +650,7 @@ setup_pi_extensions() {
     local args=()
     local exit_code
 
-    PI_EXTENSIONS_SETUP="$(dirname "$0")/pi-extensions/setup.sh"
+    PI_EXTENSIONS_SETUP="$SCRIPT_DIR/pi-extensions/setup.sh"
 
     if [[ ! -f "$PI_EXTENSIONS_SETUP" ]]; then
         echo -e "${RED}✗${NC} pi-extensions/setup.sh not found"
@@ -660,25 +658,18 @@ setup_pi_extensions() {
         return 0
     fi
 
-    chmod +x "$PI_EXTENSIONS_SETUP"
-
     if [[ "$DRY_RUN" == "true" ]]; then
         args+=("--dry-run")
     fi
-
-    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+    if [[ "$FORCE" == "true" ]]; then
         args+=("--force")
     fi
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        printf "Would run: %q" "$PI_EXTENSIONS_SETUP"
-        if [[ ${#args[@]} -gt 0 ]]; then
-            printf " %q" "${args[@]}"
-        fi
-        printf "\n"
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        args+=("--all")
     fi
 
-    if "$PI_EXTENSIONS_SETUP" "${args[@]}"; then
+    if /bin/bash "$PI_EXTENSIONS_SETUP" "${args[@]}"; then
         mark_installed "Pi Extensions"
     else
         exit_code=$?
@@ -698,7 +689,7 @@ setup_pi_skills() {
     local args=()
     local exit_code
 
-    PI_SKILLS_SETUP="$(dirname "$0")/pi-skills/setup.sh"
+    PI_SKILLS_SETUP="$SCRIPT_DIR/pi-skills/setup.sh"
 
     if [[ ! -f "$PI_SKILLS_SETUP" ]]; then
         echo -e "${RED}✗${NC} pi-skills/setup.sh not found"
@@ -706,25 +697,18 @@ setup_pi_skills() {
         return 0
     fi
 
-    chmod +x "$PI_SKILLS_SETUP"
-
     if [[ "$DRY_RUN" == "true" ]]; then
         args+=("--dry-run")
     fi
-
-    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+    if [[ "$FORCE" == "true" ]]; then
         args+=("--force")
     fi
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        printf "Would run: %q" "$PI_SKILLS_SETUP"
-        if [[ ${#args[@]} -gt 0 ]]; then
-            printf " %q" "${args[@]}"
-        fi
-        printf "\n"
+    if [[ "$INTERACTIVE_MODE" != "true" ]]; then
+        args+=("--all")
     fi
 
-    if "$PI_SKILLS_SETUP" "${args[@]}"; then
+    if /bin/bash "$PI_SKILLS_SETUP" "${args[@]}"; then
         mark_installed "Pi Skills"
     else
         exit_code=$?
@@ -738,171 +722,71 @@ setup_pi_skills() {
 }
 
 # ───────────────────────────────────────────────────────────────────────────
-# INTERACTIVE MENU
-# ───────────────────────────────────────────────────────────────────────────
-show_menu() {
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════════╗"
-    box_line "Fresh macOS Setup Menu"
-    box_sep
-    box_line "1) Core          - Homebrew, Zsh, Oh My Zsh, Git"
-    box_line "2) Dev Tools     - VS Code, lazygit, fzf, tmux"
-    box_line "3) Zed           - editor + settings"
-    box_line "4) Productivity  - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
-    box_line "5) Kubernetes    - Docker, kubectl, Helm, Minikube, K9s"
-    box_line "6) CLI Tools     - bat, eza, ripgrep, zellij"
-    box_sep
-    box_line "7) Pi Extensions - ask, exit, permissions, share, web-access"
-    box_line "8) Pi Skills     - review, ponytail, agdr, pr-review, handoff"
-    box_sep
-    box_line "A) Install All   - Run all categories above"
-    box_line "C) Custom Select - Choose specific categories"
-    box_line "Q) Quit          - Exit without installing"
-    echo "╚══════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-}
-
-custom_selection() {
-    local selection
-    local item
-
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════════╗"
-    box_line "Custom Category Selection"
-    box_sep
-    box_line "Select categories (e.g., '1 3 6'):"
-    box_line ""
-    box_line "1  - Core          (Homebrew, Zsh, Git)"
-    box_line "2  - Dev Tools     (VS Code, lazygit, fzf, tmux)"
-    box_line "3  - Zed           (editor + settings)"
-    box_line "4  - Productivity  (Ghostty, Rectangle, Obsidian, Zen, Bitwarden)"
-    box_line "5  - Kubernetes    (Docker, kubectl, Helm, Minikube, K9s)"
-    box_line "6  - CLI Tools     (bat, eza, ripgrep, zellij)"
-    box_line "7  - Pi Extensions (ask, exit, permissions, share, web-access)"
-    box_line "8  - Pi Skills     (review, ponytail, agdr, pr-review, handoff)"
-    echo "╚══════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    echo -n "Enter selection: "
-    read -r selection
-
-    for item in $selection; do
-        if ! run_category_selection "$item"; then
-            echo -e "${YELLOW}⚠ Ignoring unknown category selection: $item${NC}"
-        fi
-    done
-}
-
-# ───────────────────────────────────────────────────────────────────────────
 # SUMMARY
 # ───────────────────────────────────────────────────────────────────────────
 show_summary() {
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                         SETUP SUMMARY${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
-    echo ""
+    local package
+    echo
+    echo -e "${CYAN}Setup summary${NC}"
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo "Would install or configure:"
-    else
-        echo "Installed or configured:"
-    fi
     if [[ ${#INSTALLED_PACKAGES[@]} -gt 0 ]]; then
-        for PACKAGE in "${INSTALLED_PACKAGES[@]}"; do
-            echo -e "  ${GREEN}✓${NC} $PACKAGE"
-        done
-    else
-        echo "  (none)"
+        echo
+        [[ "$DRY_RUN" == true ]] && echo "Planned:" || echo "Changed:"
+        for package in "${INSTALLED_PACKAGES[@]}"; do echo -e "  ${GREEN}✓${NC} $package"; done
     fi
-
-    echo ""
-    echo "Already set up:"
     if [[ ${#ALREADY_SETUP_PACKAGES[@]} -gt 0 ]]; then
-        for PACKAGE in "${ALREADY_SETUP_PACKAGES[@]}"; do
-            echo -e "  ${YELLOW}↺${NC} $PACKAGE"
-        done
-    else
-        echo "  (none)"
+        echo
+        echo "Already set up:"
+        for package in "${ALREADY_SETUP_PACKAGES[@]}"; do echo -e "  ${YELLOW}↺${NC} $package"; done
     fi
-
-    echo ""
-    echo "Skipped:"
     if [[ ${#SKIPPED_PACKAGES[@]} -gt 0 ]]; then
-        for PACKAGE in "${SKIPPED_PACKAGES[@]}"; do
-            echo -e "  ${MAGENTA}•${NC} $PACKAGE"
-        done
-    else
-        echo "  (none)"
+        echo
+        echo "Skipped:"
+        for package in "${SKIPPED_PACKAGES[@]}"; do echo -e "  ${MAGENTA}•${NC} $package"; done
     fi
-
-    echo ""
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                        SETUP COMPLETE${NC}"
-    echo -e "${CYAN}════════════════════════════════════════════════════════════════════════${NC}"
-    echo ""
+    if [[ ${#INSTALLED_PACKAGES[@]} -eq 0 && ${#ALREADY_SETUP_PACKAGES[@]} -eq 0 && ${#SKIPPED_PACKAGES[@]} -eq 0 ]]; then
+        echo "  No changes."
+    fi
+    echo
 }
 
 # ───────────────────────────────────────────────────────────────────────────
 # MAIN
 # ───────────────────────────────────────────────────────────────────────────
 main() {
-    local choice
+    local category
 
-    # Header
-    echo -e "${CYAN}"
-    echo "╔══════════════════════════════════════════════════════════════════════╗"
-    box_line "Fresh macOS Setup"
-    box_line "Modular Development Environment"
-    box_sep
-    if [[ "$INTERACTIVE_MODE" == "true" ]]; then
-        box_line "Guided mode: you will be prompted before install steps"
-    else
-        box_line "Select an option to begin or press Ctrl+C to exit"
-    fi
-    echo "╚══════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo -e "${YELLOW}DRY RUN MODE - No changes will be made${NC}"
-        echo ""
-    fi
+    echo -e "${CYAN}Fresh macOS setup${NC}"
+    [[ "$DRY_RUN" == true ]] && echo -e "${YELLOW}Dry run. Nothing will be changed.${NC}"
+    echo
 
     if [[ -n "$CATEGORY" ]]; then
         if ! run_category_selection "$CATEGORY"; then
-            echo -e "${RED}Unknown category: $CATEGORY${NC}"
-            echo "Use --help to see available categories"
+            echo -e "${RED}Unknown category: $CATEGORY${NC}" >&2
+            echo "Use --help to see available categories." >&2
             exit 1
         fi
-    elif [[ "$INSTALL_ALL" == "true" ]]; then
+    elif [[ "$INSTALL_ALL" == true ]]; then
         run_category_selection "all"
-    elif [[ "$INTERACTIVE_MODE" != "true" ]]; then
-        echo -e "${RED}Interactive mode requires a TTY.${NC}"
-        echo "Use --all or --category <name> when running non-interactively."
+    elif [[ "$INTERACTIVE_MODE" != true ]]; then
+        echo -e "${RED}No categories selected.${NC} Use --all or --category <name> when running non-interactively." >&2
         exit 1
     else
-        show_menu
-        echo -n "Select option: "
-        read -r choice
-
-        case "$choice" in
-            1|2|3|4|5|6|7|8)
-                run_category_selection "$choice"
-                ;;
-            a|A)
-                run_category_selection "all"
-                ;;
-            c|C)
-                custom_selection
-                ;;
-            q|Q)
-                echo "Exiting..."
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}Invalid option${NC}"
-                exit 1
-                ;;
-        esac
+        PICKER_TITLE="Fresh macOS setup"
+        PICKER_VALUES=(core dev-tools zed productivity kubernetes cli-tools pi-extensions pi-skills)
+        PICKER_LABELS=("Core" "Development tools" "Zed" "Productivity" "Kubernetes" "CLI tools" "Pi extensions" "Pi skills")
+        PICKER_DETAILS=(
+            "Homebrew, Zsh, Oh My Zsh, Git"
+            "VS Code, lazygit, fzf, tmux"
+            "Editor and bundled settings"
+            "Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
+            "Docker, kubectl, Helm, Minikube, K9s"
+            "bat, eza, ripgrep, zellij"
+            "Commands, permission gate, diff review, web access"
+            "Review, architecture, testing, and writing skills"
+        )
+        ui_pick || exit 0
+        for category in "${PICKER_SELECTED[@]}"; do run_category_selection "$category"; done
     fi
 
     show_summary
