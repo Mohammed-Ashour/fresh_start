@@ -38,13 +38,13 @@ Each skill is a directory containing a `SKILL.md` (plus optional `references/`, 
 
 ```bash
 ./pi-skills/setup.sh                       # install all skills
-./pi-skills/setup.sh skipper-review unslop # install only these
+./pi-skills/setup.sh skipper-review        # install it and its required skills
 ./pi-skills/setup.sh --list                # what's available and what's installed
 ./pi-skills/setup.sh --dry-run             # preview, change nothing
 ./pi-skills/setup.sh --force               # also replace copies you edited locally
 ```
 
-Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Reruns are safe and only copy what changed. Or install through the main script:
+Each skill gets one status line: installed, updated, up to date, or kept because the installed copy has local changes. Selected skills automatically include their dependencies. The installer records the installed version so reruns can apply repository updates without overwriting later local edits. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-skills
@@ -97,7 +97,7 @@ Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-acces
 ./pi-extensions/setup.sh --force           # also replace copies you edited locally
 ```
 
-Same status lines as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
+Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-extensions

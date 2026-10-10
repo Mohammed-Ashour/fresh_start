@@ -18,6 +18,7 @@ PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 TARGET="$PI_DIR/extensions"
 SOURCE="$(cd "$(dirname "$0")" && pwd)/extensions"
 PACKAGE="npm:pi-web-access"
+STATE_FILE="$TARGET/.fresh-start-state"
 
 if [[ -t 1 ]]; then
     GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; RED=$'\033[0;31m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; NC=$'\033[0m'
@@ -65,11 +66,62 @@ describe() {
     esac
 }
 
-# Print the install state of one item: new, current (identical), or changed.
-state_of() {
+hash_stream() {
+    if command -v shasum >/dev/null 2>&1; then shasum -a 256 | awk '{print $1}'
+    else sha256sum | awk '{print $1}'
+    fi
+}
+
+# Hash file contents, relative paths, symlink targets, and executable bits.
+hash_item() {
+    local path="$1"
+    if [[ -L "$path" ]]; then
+        printf 'link:%s\n' "$(readlink "$path")" | hash_stream
+    elif [[ -f "$path" ]]; then
+        hash_stream < "$path"
+    else
+        (
+            cd "$path"
+            find . \( -type f -o -type l \) -print | LC_ALL=C sort | while IFS= read -r entry; do
+                if [[ -L "$entry" ]]; then
+                    printf '%s\tlink:%s\n' "$entry" "$(readlink "$entry")"
+                else
+                    [[ -x "$entry" ]] && executable=x || executable=-
+                    printf '%s\t%s\t' "$entry" "$executable"
+                    hash_stream < "$entry"
+                fi
+            done
+        ) | hash_stream
+    fi
+}
+
+saved_hash() {
     local name="$1"
-    if [[ ! -e "$TARGET/$name" ]]; then echo new
-    elif diff -rq "$SOURCE/$name" "$TARGET/$name" >/dev/null 2>&1; then echo current
+    [[ -f "$STATE_FILE" ]] || return 0
+    awk -F '\t' -v name="$name" '$1 == name { print $2; exit }' "$STATE_FILE"
+}
+
+record_hash() {
+    local name="$1" temporary="$STATE_FILE.$$.tmp"
+    mkdir -p "$TARGET"
+    if [[ -f "$STATE_FILE" ]]; then
+        awk -F '\t' -v name="$name" '$1 != name' "$STATE_FILE" > "$temporary"
+    else
+        : > "$temporary"
+    fi
+    printf '%s\t%s\n' "$name" "$(hash_item "$SOURCE/$name")" >> "$temporary"
+    mv "$temporary" "$STATE_FILE"
+}
+
+# Distinguish safe repository updates from edits made to the installed copy.
+state_of() {
+    local name="$1" source_hash target_hash previous_hash
+    if [[ ! -e "$TARGET/$name" && ! -L "$TARGET/$name" ]]; then echo new; return; fi
+    source_hash="$(hash_item "$SOURCE/$name")"
+    target_hash="$(hash_item "$TARGET/$name")"
+    if [[ "$source_hash" == "$target_hash" ]]; then echo current; return; fi
+    previous_hash="$(saved_hash "$name")"
+    if [[ -n "$previous_hash" && "$target_hash" == "$previous_hash" ]]; then echo update
     else echo changed
     fi
 }
@@ -110,7 +162,8 @@ if [[ "$LIST" == true ]]; then
         case "$(state_of "$name")" in
             new) row "${DIM}○${NC}" "$name" "$DIM" "not installed" "$(describe "$name")" ;;
             current) row "${GREEN}✓${NC}" "$name" "$GREEN" "installed, up to date" "$(describe "$name")" ;;
-            changed) row "${YELLOW}!${NC}" "$name" "$YELLOW" "installed, differs" "$(describe "$name")" ;;
+            update) row "${GREEN}↑${NC}" "$name" "$GREEN" "update available" "$(describe "$name")" ;;
+            changed) row "${YELLOW}!${NC}" "$name" "$YELLOW" "installed, locally modified" "$(describe "$name")" ;;
         esac
     done
     exit 0
@@ -150,6 +203,7 @@ for name in "${TODO[@]}"; do
     state="$(state_of "$name")"
     if [[ "$state" == current ]]; then
         row "${GREEN}✓${NC}" "$name" "$DIM" "up to date" "$(describe "$name")"
+        [[ "$DRY_RUN" == false ]] && record_hash "$name"
         current=$((current + 1))
         continue
     fi
@@ -161,6 +215,7 @@ for name in "${TODO[@]}"; do
     if [[ "$DRY_RUN" == false ]]; then
         rm -rf "${TARGET:?}/$name"
         cp -R "$SOURCE/$name" "$TARGET/$name"
+        record_hash "$name"
     fi
     if [[ "$state" == new ]]; then
         row "${GREEN}+${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would install" || echo installed)" "$(describe "$name")"
