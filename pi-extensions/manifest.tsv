@@ -8,3 +8,4 @@ mini-agents	/reviewers and /researchers background subagents
 permission-gate.ts	Blocks dangerous commands (modes in permissions.json)
 permissions.json	Permission modes for permission-gate (default: safeMode)
 share-local.ts	/share-local: export the session to HTML
+codex-accounts	Multi-account ChatGPT/Codex sign-in, rotation, and usage

@@ -31,7 +31,7 @@ Modular macOS development environment setup with interactive multi-select picker
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
-| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, diff-review, diff-review-web, mini-agents, pi-web-access |
+| `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, codex-accounts, diff-review, diff-review-web, mini-agents, pi-web-access |
 | `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
 
 ## Pi Skills
@@ -96,6 +96,7 @@ Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-acces
 ./pi-extensions/setup.sh                   # choose extensions interactively
 ./pi-extensions/setup.sh --all             # install all extensions + pi-web-access
 ./pi-extensions/setup.sh mini-agents       # install it + required pi-web-access
+./pi-extensions/setup.sh codex-accounts    # install ChatGPT account management
 ./pi-extensions/setup.sh --list            # show availability and install status
 ./pi-extensions/setup.sh --all --dry-run   # preview all, change nothing
 ./pi-extensions/setup.sh --all --force     # overwrite every installed extension copy
@@ -127,6 +128,15 @@ Same status lines and safe update tracking as the skills script. It also warns w
 **Context Usage**
 - footer status bar showing current context usage
 - warning indicator at 50%+
+
+**Codex Accounts**
+- `/codex` manages several ChatGPT accounts using the same native sign-in as `/login`
+- normal `openai-codex` models rotate accounts on quota exhaustion without replacing core credentials or rewriting startup settings
+- account picker marks current, next and default accounts; Tab completes `/codex use`, `default` and `remove`
+- session switching and the default for new sessions are separate actions
+- `/codex-usage` shows remaining short-window and weekly quota, reset times and stale-data warnings
+- compact footer with the selected account, remaining quota and confirmed-ready count
+- details in `pi-extensions/extensions/codex-accounts/README.md`
 
 **Web Access**
 - installed from the LazyPi stack via `npm:pi-web-access`
