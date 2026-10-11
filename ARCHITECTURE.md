@@ -70,11 +70,11 @@ flowchart TD
 
 Pi owns `auth.json` writes, locking and OAuth refresh. The extension owns `codex-accounts.json`, with a separate metadata-only lock and restrictive file permissions. The native core slot remains usable when the extension is disabled. Archived providers belong to the helper runtime and never register another OAuth login in the main runtime. Only upgraded installations retain legacy virtual aliases.
 
-Setting a default changes future sessions. Switching changes this session and selects a normal Codex model when needed. UI notifications and quota display failures must not abort native requests. Recovery contains storage/registry failures and warns once per session so startup still arms quota polling. Native request callback failures remain visible to callers. Archiving is a credential-preservation requirement, not optional metadata; failures require retry or cancellation rather than silent account replacement. See `docs/agdr/AgDR-0002-codex-login-archive-retry.md`.
+Setting a default changes future sessions. Switching changes this session and selects a normal Codex model when needed. UI notifications and quota display failures must not abort native requests. Recovery contains storage/registry failures and warns once per session so startup still arms quota polling. Native request callback failures remain visible to callers. Archiving is a credential-preservation requirement, not optional metadata; failures require retry or cancellation rather than silent account replacement.
 
 ## Architecture Change Protocol
 
-Record changes to provider identity, credential ownership or failover semantics in `docs/agdr/`. Keep native credential operations separate from metadata writes. Run the offline suite before installation and verify that normal Codex auth still works without the extension. Installer overwrite rules remain independent of authentication behavior.
+Document changes to provider identity, credential ownership or failover semantics in this architecture document. Keep native credential operations separate from metadata writes. Run the offline suite before installation and verify that normal Codex auth still works without the extension. Installer overwrite rules remain independent of authentication behavior.
 
 ## Future Clarifications
 
