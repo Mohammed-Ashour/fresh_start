@@ -60,7 +60,7 @@ flowchart TD
 ## Core Data Flow (Current)
 
 1. Loading discovers existing credentials and metadata. A one-time repair restores a missing core credential through Pi's locked operations. It does not replace a valid core credential or rewrite settings. Session startup, reload and model selection repair known account-specific model selections. An input handler also repairs them after native login, before Pi's auth preflight. Virtual alias registration alone cannot guarantee that an old physical model object is replaced.
-2. `/login` and `/codex add` use the same native OAuth method. A different previous account moves into a private credential slot. The newly signed-in account remains in `openai-codex`.
+2. `/login` and `/codex add` use the same native OAuth method. A different previous account moves into a private credential slot before Pi replaces the core login. If archiving fails after approval, a retry/cancel dialog retains the pending credential in memory. Retrying reuses that approval and re-reads the previous credential; cancellation does not replace the previous core login. The newly signed-in account remains in `openai-codex` after successful persistence.
 3. A request selects the session preference, current account or default, skipping known exhaustion in either quota window. Unknown quota remains eligible but is not counted as confirmed ready.
 4. Native OAuth refresh runs through Pi's credential store lock. The stream wrapper supplies the chosen account token while preserving model, transcript and callbacks.
 5. A proven quota error before content tries another account. Partial text, thinking, tool calls, authentication errors, cancellation and generic throttling do not trigger account replay. Normal transient retries stay native.
@@ -70,7 +70,7 @@ flowchart TD
 
 Pi owns `auth.json` writes, locking and OAuth refresh. The extension owns `codex-accounts.json`, with a separate metadata-only lock and restrictive file permissions. The native core slot remains usable when the extension is disabled. Archived providers belong to the helper runtime and never register another OAuth login in the main runtime. Only upgraded installations retain legacy virtual aliases.
 
-Setting a default changes future sessions. Switching changes this session and selects a normal Codex model when needed. UI notifications and quota display failures must not abort native requests. Native request callback failures remain visible to callers.
+Setting a default changes future sessions. Switching changes this session and selects a normal Codex model when needed. UI notifications and quota display failures must not abort native requests. Recovery contains storage/registry failures and warns once per session so startup still arms quota polling. Native request callback failures remain visible to callers. Archiving is a credential-preservation requirement, not optional metadata; failures require retry or cancellation rather than silent account replacement. See `docs/agdr/AgDR-0002-codex-login-archive-retry.md`.
 
 ## Architecture Change Protocol
 

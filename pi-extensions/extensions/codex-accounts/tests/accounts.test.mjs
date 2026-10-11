@@ -389,3 +389,98 @@ test('removing an account from a stale picker never deletes a newer native login
     assert.deepEqual(f.store.accounts().map(a => a.accountId), ['b']);
     await assert.rejects(f.accounts.remove(oldPickerChoice), /no longer saved/);
 });
+
+for (const mode of ['native login hook', '/codex add']) {
+    test(`archive failure offers retry without repeating OAuth: ${mode}`, async t => {
+        const f = await fixture(t, { [CORE]: token('a') }); await f.accounts.migrate();
+        let approvals = 0, archives = 0, prompts = 0;
+        f.builtin.auth.oauth.login = async () => { approvals++; return token('b'); };
+        const originalLogin = f.runtime.login.bind(f.runtime);
+        t.mock.method(f.runtime, 'login', async (provider, ...args) => {
+            if (provider === 'codex-account-a' && ++archives === 1) throw new Error('Disk write failed: fake-sensitive-detail');
+            return originalLogin(provider, ...args);
+        });
+        const callbacks = { ...interaction, prompt: async prompt => {
+            prompts++;
+            assert.equal(prompt.type, 'select'); assert.equal(prompt.signal, interaction.signal);
+            assert.match(prompt.message, /authorization completed/); assert.match(prompt.message, /new login is not saved/);
+            assert.doesNotMatch(prompt.message, /fake-sensitive-detail/);
+            assert.deepEqual(prompt.options.map(o => o.id), ['retry', 'cancel']);
+            assert.equal(f.store.credential(CORE).accountId, 'a');
+            // A concurrent ordinary refresh can rotate the old token while the retry dialog is open.
+            await f.accounts.save(CORE, { ...token('a'), refresh: 'current-refresh-a' });
+            return 'retry';
+        } };
+        if (mode === '/codex add') await f.accounts.add(callbacks);
+        else { const pending = await f.accounts.login(callbacks); await f.accounts.save(CORE, pending); await f.accounts.sync(); }
+        assert.equal(approvals, 1); assert.equal(archives, 2); assert.equal(prompts, 1);
+        assert.equal(f.store.credential(CORE).accountId, 'b');
+        assert.equal(f.store.credential('codex-account-a').refresh, 'current-refresh-a');
+        assert.deepEqual(f.store.accounts().map(a => a.accountId).sort(), ['a', 'b']);
+    });
+}
+
+for (const mode of ['cancel', 'abort']) {
+    test(`archive retry dialog ${mode} preserves the previous login`, async t => {
+        const f = await fixture(t, { [CORE]: token('a') }); await f.accounts.migrate();
+        let approvals = 0, writes = 0;
+        f.builtin.auth.oauth.login = async () => { approvals++; return token('b'); };
+        t.mock.method(f.runtime, 'login', async () => { writes++; throw new Error('Storage unavailable'); });
+        const before = readFileSync(f.store.authPath, 'utf8');
+        const controller = new AbortController();
+        await assert.rejects(f.accounts.add({ ...interaction, signal: controller.signal, prompt: async () => {
+            if (mode === 'abort') { controller.abort(); return 'retry'; }
+            return 'cancel';
+        } }), mode === 'abort' ? /abort/i : /previous login was not replaced/i);
+        assert.equal(approvals, 1); assert.equal(writes, 1);
+        assert.equal(readFileSync(f.store.authPath, 'utf8'), before);
+        assert.equal(f.accounts.next, undefined);
+        assert.deepEqual(f.store.accounts().map(a => a.accountId), ['a']);
+    });
+}
+
+for (const failure of ['registry', 'credentials', 'notification']) {
+    test(`legacy recovery ${failure} failure leaves polling armed and does not spam input errors`, async t => {
+        const f = await fixture(t, { [CORE]: token('a') }); await f.accounts.migrate();
+        const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = f.root;
+        const originalFetch = globalThis.fetch;
+        const handlers = new Map(), intervals = new Set(), warnings = [], statuses = [];
+        t.after(() => {
+            handlers.get('session_shutdown')?.(); globalThis.fetch = originalFetch;
+            if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previous;
+        });
+        t.mock.method(globalThis, 'setInterval', (callback, ms) => { const timer = { callback, ms }; intervals.add(timer); return timer; });
+        t.mock.method(globalThis, 'clearInterval', timer => intervals.delete(timer));
+        globalThis.fetch = async () => new Response(JSON.stringify({ rate_limit: {
+            primary_window: { used_percent: 20, reset_at: (Date.now() + 3600_000) / 1000 },
+            secondary_window: { used_percent: 30, reset_at: (Date.now() + 86400_000) / 1000 } } }));
+        let broken = true, refreshes = 0, notifications = 0;
+        const ctx = { mode: 'tui', hasUI: true, model: { ...model, provider: 'codex-a' },
+            modelRegistry: { find: () => model, refresh: async () => { refreshes++; if (failure === 'registry' && broken) throw new Error('Corrupt model cache'); } },
+            ui: { setStatus: (key, value) => statuses.push([key, value]), notify: (message, type) => {
+                notifications++; if (failure === 'notification') throw new Error('UI unavailable');
+                if (type === 'warning') warnings.push(message);
+            } } };
+        await extension({ registerProvider() {}, registerVirtualModel() {}, registerCommand() {},
+            on: (name, handler) => handlers.set(name, handler), setModel: async m => { ctx.model = m; return true; } });
+        if (failure === 'credentials') writeFileSync(f.store.authPath, '{broken');
+        await assert.doesNotReject(handlers.get('session_start')({}, ctx));
+        assert.equal(intervals.size, 1); assert.equal([...intervals][0].ms, 60_000);
+        const beforeTick = statuses.length;
+        [...intervals][0].callback(); // the periodic footer update still runs after recovery fails
+        assert.ok(statuses.length > beforeTick);
+        await assert.doesNotReject(handlers.get('input')({}, ctx));
+        await assert.doesNotReject(handlers.get('input')({}, ctx));
+        if (failure === 'notification') {
+            assert.equal(ctx.model.provider, CORE); assert.equal(notifications, 1);
+        } else {
+            assert.equal(warnings.length, 1); assert.match(warnings[0], /Quota polling will continue/);
+            if (failure === 'registry') assert.equal(refreshes, 3);
+            broken = false;
+            if (failure === 'credentials') writeFileSync(f.store.authPath, JSON.stringify({ [CORE]: token('a') }));
+            await handlers.get('input')({}, ctx); // failure does not leave the reentrancy guard stuck
+            assert.equal(ctx.model.provider, CORE);
+        }
+        handlers.get('session_shutdown')(); assert.equal(intervals.size, 0);
+    });
+}

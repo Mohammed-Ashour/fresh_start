@@ -12,7 +12,7 @@ Requires Pi 1.1.0's native provider and ModelRuntime APIs. Tested on Node 22.
 
 Run `/reload` in Pi. Use `/codex` to sign in or add accounts. Browser and device-code authentication use Pi's built-in OpenAI OAuth implementation. Select a normal `openai-codex` model through `/model`; no special routing model is required.
 
-`/login` → **Codex (ChatGPT accounts)** calls the same sign-in flow. It preserves the previous account when you sign into a different one. You can use `/codex` exclusively, but normal Pi login still works.
+`/login` → **Codex (ChatGPT accounts)** calls the same sign-in flow. It preserves the previous account when you sign into a different one. If saving that previous account fails after OpenAI approval, choose **Retry saving** to reuse the completed approval without reopening the browser. **Cancel** leaves the previous core login unreplaced; the new login is not saved. You can use `/codex` exclusively, but normal Pi login still works.
 
 ## Commands
 
@@ -40,7 +40,7 @@ Both the short window and weekly window count toward exhaustion. The footer show
 - Pi's public ModelRuntime methods own credential writes, logout and locked OAuth refresh. The extension reads `auth.json` but never writes it directly.
 - `codex-accounts.json` holds the default, account order, quota snapshots and reset bookkeeping. It contains no tokens and uses mode `0600`.
 - Startup settings are never rewritten. Upgrades retain old `codex-multi/auto` and `codex-<accountId>/<model>` selections as virtual compatibility aliases. Fresh installs do not create them. Pi may list upgraded keyless aliases as API-key placeholders; they are not sign-in methods. Use the single Codex OAuth entry or `/codex`.
-- Restored account-specific selections automatically move to `openai-codex` on startup, reload or model selection. The next input also repairs a stale selection after native `/login`, before Pi checks request authentication. Recovery preserves the selected model ID, refreshes Pi's auth availability snapshot and does not rewrite startup settings. Registered virtual aliases alone do not repair an old physical model object.
+- Restored account-specific selections automatically move to `openai-codex` on startup, reload or model selection. The next input also repairs a stale selection after native `/login`, before Pi checks request authentication. Recovery preserves the selected model ID, refreshes Pi's auth availability snapshot and does not rewrite startup settings. Registered virtual aliases alone do not repair an old physical model object. Recovery failures produce at most one warning per session and do not prevent quota polling or cause repeated input-handler errors.
 - A one-time repair restores a missing `openai-codex` credential left by the previous extension. It copies through Pi's credential runtime, then removes the duplicate legacy slot. A valid core credential is never replaced during repair.
 - `/codex` removal promotes a remaining account if you remove the core account. Native `/logout` signs out the core slot normally; use `/codex` removal to manage all saved accounts.
 

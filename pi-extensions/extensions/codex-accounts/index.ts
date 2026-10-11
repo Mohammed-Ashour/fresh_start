@@ -88,21 +88,23 @@ export default async function (pi: ExtensionAPI) {
     try { aliases(); } catch { /* core provider registration stays intact */ }
 
     let recoveringSelection = false;
+    let recoveryWarningShown = false;
     async function recoverLegacySelection(ctx: ExtensionContext): Promise<void> {
-        const selected = ctx.model;
-        if (recoveringSelection || !selected || !["openai-codex-responses", "pi-virtual"].includes(selected.api)
-            || !selected.provider.startsWith(PREFIX) || selected.provider === "codex-multi") return;
-        // Restored physical objects can outlive provider registration; signing in does not rebind them.
-        // Move legacy selections to the native provider, including models absent from the current catalog.
-        const known = accounts.safeState().legacyAliases?.includes(selected.provider)
-            || store.accounts().some(a => a.id === selected.provider);
-        if (!known || !store.credential(CORE)) return;
-        const model = ctx.modelRegistry.find(CORE, selected.id)
-            ?? (selected.api === "openai-codex-responses" ? { ...selected, provider: CORE } : undefined);
-        if (!model) return;
+        if (recoveringSelection) return;
         recoveringSelection = true;
         const lifecycle = stopped;
         try {
+            const selected = ctx.model;
+            if (!selected || !["openai-codex-responses", "pi-virtual"].includes(selected.api)
+                || !selected.provider.startsWith(PREFIX) || selected.provider === "codex-multi") return;
+            // Restored physical objects can outlive provider registration; signing in does not rebind them.
+            // Move legacy selections to the native provider, including models absent from the current catalog.
+            const known = accounts.safeState().legacyAliases?.includes(selected.provider)
+                || store.accounts().some(a => a.id === selected.provider);
+            if (!known || !store.credential(CORE)) return;
+            const model = ctx.modelRegistry.find(CORE, selected.id)
+                ?? (selected.api === "openai-codex-responses" ? { ...selected, provider: CORE } : undefined);
+            if (!model) return;
             // setModel checks Pi's cached configured-auth snapshot, not just auth.json.
             // Registration/reload and native login can leave that snapshot behind the saved credential.
             await ctx.modelRegistry.refresh({ allowNetwork: false });
@@ -110,7 +112,15 @@ export default async function (pi: ExtensionAPI) {
                 || ctx.model?.provider !== selected.provider || ctx.model.id !== selected.id) return;
             if (await pi.setModel(model)) {
                 if (!accounts.next && store.accounts().some(a => a.id === selected.provider)) accounts.next = selected.provider;
-                ctx.ui.notify(`Recovered Codex selection: ${CORE}/${model.id}. No new sign-in needed.`, "info");
+                try { ctx.ui.notify(`Recovered Codex selection: ${CORE}/${model.id}. No new sign-in needed.`, "info"); }
+                catch { /* successful recovery must not depend on notifications */ }
+            }
+        } catch {
+            // Storage or registry failures must not skip session setup or fail every input handler.
+            if (!lifecycle.signal.aborted && lifecycle === stopped && !recoveryWarningShown) {
+                recoveryWarningShown = true;
+                try { ctx.ui.notify("Codex selection recovery failed. Quota polling will continue; check model/credential storage and use /codex use to select an account.", "warning"); }
+                catch { /* optional UI */ }
             }
         } finally { recoveringSelection = false; }
     }
@@ -318,9 +328,9 @@ export default async function (pi: ExtensionAPI) {
         timer = undefined;
         context = ctx;
         accounts.active = undefined; accounts.next = accounts.safeState().default;
-        lastAccount = undefined; announcedAccount = undefined;
+        lastAccount = undefined; announcedAccount = undefined; recoveryWarningShown = false;
         ctx.ui.setStatus("codex-refresh", undefined);
-        if (startupWarning) ctx.ui.notify(startupWarning, "warning");
+        if (startupWarning) { try { ctx.ui.notify(startupWarning, "warning"); } catch { /* optional UI */ } }
         await recoverLegacySelection(ctx);
         status(ctx);
         const pollAll = () => {

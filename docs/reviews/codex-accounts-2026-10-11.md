@@ -12,7 +12,7 @@
 
 ## Verification
 
-- 23 offline tests passed with temporary credentials and fake network responses.
+- 30 offline tests passed with temporary credentials and fake network responses.
 - The integration test uses Pi's real extension loader, ModelRuntime, native Codex SSE adapter, virtual model routing and credential locking. It exercises quota failover, continuation, reload, generic throttling and transient retries.
 - Credential tests cover core preservation, old migration repair, native/extension sign-in hooks, cancellation, duplicate removal, concurrent refresh, malformed storage and account removal/promotion.
 - UX tests cover command completion, duplicate labels, remaining percentages, current/default/next roles, switching from another provider, cancelled removal, refresh progress and stale-report suppression.
@@ -26,6 +26,11 @@ The user's successful quota lookup and native login still left a session selecti
 `pi-extensions/extensions/codex-accounts/index.ts` now repairs known account-specific physical and virtual selections on session startup/reload, model selection and input. It refreshes the full offline availability snapshot before setting the native model. A provider-only refresh raced background registration refreshes in the regression test and left `setModel()` returning false. Input recovery happens before auth preflight, unlike `before_agent_start`. The selected model ID and global settings stay unchanged.
 
 The added regression failed before the fix and now passes using Pi's real AgentSession, loader, model runtime and temporary credentials. It tests resume, in-process reload, client model selection, an uncatalogued model ID and credentials saved after startup. Fake SSE responses confirm successful requests record `openai-codex` rather than the removed account credential provider. Real user credentials and session files were inspected only for credential-slot and model-selection metadata, not modified by these tests.
+
+## External review robustness fixes
+
+- SK-DR-001: `recoverLegacySelection()` now contains credential-read, registry-refresh and notification failures at the recovery boundary. Startup still arms the quota interval, and repeated input attempts generate no repeated handler errors. A warning appears at most once per session. Tests inject registry rejection, malformed credentials and a throwing notification callback; they verify the timer runs, shutdown clears it, and recovery can succeed on a later attempt.
+- SK-DR-002: failed archiving now opens a retry/cancel dialog after OpenAI approval. Retry retains the pending credential in memory, re-reads the previous core credential and retries archiving without another OAuth approval. Cancellation or abort leaves the core login unreplaced. The proposed catch-and-continue was not used: returning the new credential would overwrite the old account's only saved credential, so archiving it on a later sign-in would be impossible. Tests cover both the native hook and `/codex add`, a refreshed previous token during the retry prompt, cancellation and abort.
 
 ## Residual risks
 

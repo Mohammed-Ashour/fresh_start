@@ -49,13 +49,30 @@ export class Accounts {
         if (!account) throw new Error("OpenAI returned an invalid account credential");
         let previous = this.store.credential(CORE);
         let old = credentialAccount(previous, CORE);
-        if (previous && old && old.id !== account.id) {
+        while (previous && old && old.id !== account.id) {
+            interaction.signal.throwIfAborted();
             // Refresh before archiving: normal Pi requests must not rotate the token we are copying.
             try { await this.runtime.getAuth(CORE, { signal: interaction.signal, minOAuthValidityMs: 10 * 60_000 }); }
             catch { interaction.signal.throwIfAborted(); /* retain even an expired login for explicit reauthentication */ }
             previous = this.store.credential(CORE);
             old = credentialAccount(previous, CORE);
-            if (previous && old && old.id !== account.id) await this.save(archiveId(old), previous);
+            if (!previous || !old || old.id === account.id) break;
+            try { await this.save(archiveId(old), previous); break; }
+            catch {
+                interaction.signal.throwIfAborted();
+                // Returning the new login here would overwrite the previous account's only saved token.
+                const choice = await interaction.prompt({
+                    type: "select", signal: interaction.signal,
+                    message: "OpenAI authorization completed, but Pi could not save your previous account. The new login is not saved yet. Retry without reopening the browser, or cancel to keep the previous login.",
+                    options: [{ id: "retry", label: "Retry saving the previous account" },
+                        { id: "cancel", label: "Cancel; keep the previous login" }],
+                });
+                interaction.signal.throwIfAborted();
+                if (choice !== "retry") throw new Error("Sign-in was not saved because the previous account could not be archived. The previous login was not replaced.");
+                // The core slot may have refreshed while the dialog was open.
+                previous = this.store.credential(CORE);
+                old = credentialAccount(previous, CORE);
+            }
         }
         interaction.signal.throwIfAborted();
         // Metadata is optional. A disk error must not turn a successful native login into a failure.
