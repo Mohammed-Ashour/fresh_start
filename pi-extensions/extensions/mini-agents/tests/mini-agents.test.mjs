@@ -32,6 +32,164 @@ await build({
 const extension = await import(pathToFileURL(output));
 const { visibleWidth } = await import(pathToFileURL(join(host, "node_modules/@earendil-works/pi-tui/dist/index.js")));
 
+test("question waits for a reply, rejects duplicate questions, and cancels cleanly", async () => {
+  const job = extension.makeJobs("implementer")[0];
+  const controller = new AbortController();
+  let notified = 0;
+  const waiting = extension.waitForAnswer(job, "Which file?", controller.signal, undefined, () => notified++);
+  assert.equal(notified, 1);
+  assert.match(job.activity, /Waiting for your reply/);
+  await assert.rejects(extension.waitForAnswer(job, "Another?", controller.signal, undefined, () => {}), /already waiting/);
+  job.question.answer("src/main.ts");
+  assert.equal(await waiting, "src/main.ts");
+  assert.equal(job.question, undefined);
+  const cancelled = extension.waitForAnswer(job, "Continue?", controller.signal, undefined, () => {});
+  controller.abort();
+  await assert.rejects(cancelled, /cancelled/);
+  assert.equal(job.question, undefined);
+});
+
+test("implementer asks without a modal, resumes on reply, and exposes editing tools", async () => {
+  const service = await modelServer("question");
+  const harness = commandHarness(service);
+  try {
+    await harness.commands.get("implementer").handler("Update a file", harness.context);
+    await waitFor(() => harness.notifications.some(({ message }) => message.includes("needs your reply")));
+    assert.equal(harness.reports.length, 0);
+    assert.equal(harness.menuCount, 1);
+    const tools = service.requests[0].tools.map((tool) => tool.function.name);
+    for (const name of ["read", "edit", "write", "bash", "ask_user", "fixture_mcp"]) assert.ok(tools.includes(name), name);
+    assert.ok(!tools.includes("mini_agents_start_implementer"));
+    assert.ok(JSON.stringify(service.requests[0].messages).includes("Parent effective instructions"));
+    assert.equal(harness.startupMessages.length, 1);
+    harness.context.ui.select = async (_title, options) => options[0];
+    await harness.commands.get("implementer").handler("peek", harness.context);
+    assert.match(harness.peeks.at(-1).join("\n"), /Question: Which file/);
+    assert.equal(harness.menuCount, 1, "Peek must not open a custom screen or capture the editor");
+    await harness.commands.get("implementer").handler("Another task", harness.context);
+    assert.ok(harness.notifications.some(({ message }) => message.includes("already running")));
+    await harness.commands.get("implementer").handler("reply src/main.ts", harness.context);
+    await waitFor(() => harness.reports.length === 1);
+    assert.match(harness.reports[0].content, /Implementation #1/);
+    assert.match(harness.peeks.at(-1)[0], /Finished/);
+    await harness.commands.get("implementer").handler("peek close", harness.context);
+    assert.equal(harness.widgets.at(-1), undefined);
+    assert.ok(JSON.stringify(service.requests[1].messages).includes("src/main.ts"));
+    await harness.commands.get("implementer").handler("reply stale", harness.context);
+    assert.match(harness.notifications.at(-1).message, /No implementer question/);
+  } finally { await harness.close(); }
+});
+
+test("implementer writes in the requested checkout and delivers the result", async () => {
+  const service = await modelServer("write");
+  const harness = commandHarness(service);
+  try {
+    await harness.commands.get("implementer").handler("Write implemented.txt", harness.context);
+    await waitFor(() => harness.reports.length === 1);
+    assert.ok(existsSync(join(harness.context.cwd, "implemented.txt")), JSON.stringify(service.requests[1]?.messages));
+    assert.equal(readFileSync(join(harness.context.cwd, "implemented.txt"), "utf8"), "implemented\n");
+    assert.ok(harness.parentCalls.includes("write"), "Child writes must pass through parent tool_call hooks");
+    assert.match(harness.reports[0].content, /No actionable findings/);
+    assert.ok(!harness.notifications.some(({ level }) => level === "error"));
+  } finally { await harness.close(); }
+});
+
+test("live parent permission mode blocks child writes without a raw-tool fallback", async () => {
+  const service = await modelServer("question-write");
+  const harness = commandHarness(service);
+  try {
+    await harness.commands.get("implementer").handler("Ask then write implemented.txt", harness.context);
+    await waitFor(() => harness.notifications.some(({ message }) => message.includes("needs your reply")));
+    await harness.setPermissionMode("plan");
+    await harness.commands.get("implementer").handler("reply proceed", harness.context);
+    await waitFor(() => harness.reports.length === 1);
+    assert.equal(existsSync(join(harness.context.cwd, "implemented.txt")), false);
+    assert.match(JSON.stringify(service.requests[2].messages), /Plan mode: only .md files allowed/);
+  } finally { await harness.close(); }
+});
+
+test("custom external tools run through parent result hooks", async () => {
+  const service = await modelServer("external");
+  const harness = commandHarness(service);
+  try {
+    await harness.commands.get("implementer").handler("Call fixture_mcp", harness.context);
+    await waitFor(() => harness.reports.length === 1);
+    assert.ok(harness.parentCalls.includes("fixture_mcp"));
+    assert.match(JSON.stringify(service.requests[1].messages), /filtered by parent hook/);
+    assert.ok(!JSON.stringify(service.requests[1].messages).includes("external result"));
+  } finally { await harness.close(); }
+});
+
+test("implementer fails closed when no parent executor is supplied", async () => {
+  const service = await modelServer();
+  const job = extension.makeJobs("implementer")[0];
+  try {
+    await extension.runJob(job, "implementer", "Write a file", fixture(), service.model,
+      service.runtime, new AbortController().signal, () => {});
+    assert.equal(job.state, "failed");
+    assert.match(job.activity, /checked tool executor/);
+    assert.equal(service.requests.length, 0);
+  } finally { await service.close(); }
+});
+
+test("startup refuses unauthorized tokens and stays non-callable to other tools", async () => {
+  const harness = commandHarness(await modelServer());
+  try {
+    const start = harness.registeredTools.get("mini_agents_start_implementer");
+    assert.equal(start.exposure, "model-only");
+    await assert.rejects(start.execute("bad", { token: "invented" }), /No authorized/);
+    assert.equal(harness.startupMessages.length, 0);
+  } finally { await harness.close(); }
+});
+
+test("cancelling queued startup invalidates its token and starts no child", async () => {
+  const service = await modelServer();
+  const harness = commandHarness(service, { manualStartup: true });
+  try {
+    await harness.commands.get("implementer").handler("Update a file", harness.context);
+    assert.equal(harness.startupMessages.length, 1);
+    assert.equal(service.requests.length, 0);
+    await harness.commands.get("implementer").handler("stop", harness.context);
+    await waitFor(() => harness.widgets.at(-1) === undefined);
+    const token = JSON.parse(harness.startupMessages[0].match(/with token ("[^"]+")/)[1]);
+    await assert.rejects(harness.registeredTools.get("mini_agents_start_implementer").execute("late", { token }), /No authorized/);
+    assert.equal(service.requests.length, 0);
+  } finally { await harness.close(); }
+});
+
+test("disabled startup tool fails without triggering a parent turn", async () => {
+  const harness = commandHarness(await modelServer());
+  try {
+    harness.registeredTools.delete("mini_agents_start_implementer");
+    await harness.commands.get("implementer").handler("Update a file", harness.context);
+    assert.match(harness.notifications.at(-1).message, /Enable mini_agents_start_implementer/);
+    assert.equal(harness.startupMessages.length, 0);
+  } finally { await harness.close(); }
+});
+
+test("implementer confirmation can decline without starting work", async () => {
+  const service = await modelServer();
+  const harness = commandHarness(service);
+  harness.context.ui.confirm = async () => false;
+  try {
+    await harness.commands.get("implementer").handler("Update a file", harness.context);
+    assert.equal(service.requests.length, 0);
+    assert.equal(harness.widgets.length, 0);
+  } finally { await harness.close(); }
+});
+
+test("stopping an implementer cancels a pending question", async () => {
+  const service = await modelServer("question");
+  const harness = commandHarness(service);
+  try {
+    await harness.commands.get("implementer").handler("Update a file", harness.context);
+    await waitFor(() => harness.notifications.some(({ message }) => message.includes("needs your reply")));
+    await harness.commands.get("implementer").handler("stop", harness.context);
+    await waitFor(() => harness.reports.length === 1);
+    assert.match(harness.reports[0].content, /cancelled/);
+  } finally { await harness.close(); }
+});
+
 /** Create a private fixture folder for one test. */
 function fixture() { return mkdtempSync(join(temporary, "case-")); }
 
@@ -49,7 +207,19 @@ async function modelServer(mode = "success") {
       id: "fixture", object: "chat.completion.chunk", created: 1, model: "fixture",
       choices: [{ index: 0, delta, finish_reason }],
     })}\n\n`;
-    if (mode === "web" && requests.length === 1 && requests[0].tools.some((tool) => tool.function.name === "web_enable")) {
+    if (mode === "external" && requests.length === 1) {
+      response.write(chunk({ role: "assistant", tool_calls: [{ index: 0, id: "external-call", type: "function",
+        function: { name: "fixture_mcp", arguments: "{}" } }] }));
+      response.write(chunk({}, "tool_calls"));
+    } else if ((mode === "write" && requests.length === 1) || (mode === "question-write" && requests.length === 2)) {
+      response.write(chunk({ role: "assistant", tool_calls: [{ index: 0, id: "write-file", type: "function",
+        function: { name: "write", arguments: JSON.stringify({ path: "implemented.txt", content: "implemented\n" }) } }] }));
+      response.write(chunk({}, "tool_calls"));
+    } else if ((mode === "question" || mode === "question-write") && requests.length === 1) {
+      response.write(chunk({ role: "assistant", tool_calls: [{ index: 0, id: "ask-user", type: "function",
+        function: { name: "ask_user", arguments: JSON.stringify({ question: "Which file should I change?" }) } }] }));
+      response.write(chunk({}, "tool_calls"));
+    } else if (mode === "web" && requests.length === 1 && requests[0].tools.some((tool) => tool.function.name === "web_enable")) {
       response.write(chunk({ role: "assistant", tool_calls: [{ index: 0, id: "enable-web", type: "function",
         function: { name: "web_enable", arguments: "{}" } }] }));
       response.write(chunk({}, "tool_calls"));
@@ -388,7 +558,7 @@ test("reviewer sessions return text and expose only read-only tools", async () =
     assert.equal(service.requests.length, 1);
     assert.ok(updates > 1);
     const names = service.requests[0].tools.map((tool) => tool.function.name).sort();
-    assert.deepEqual(names, ["find", "git_changes", "grep", "ls", "read"]);
+    assert.deepEqual(names, ["find", "git_changes", "github_data", "grep", "ls", "read"]);
     assert.match(JSON.stringify(service.requests[0]), /read every SKILL.md that fits the user's request/);
   } finally { await service.close(); }
 });
@@ -472,13 +642,13 @@ test("run limit aborts a hung run and reports it as cancelled", async () => {
   } finally { delete process.env.MINI_AGENTS_RUN_LIMIT_MS; }
 });
 
-test("extension registers only the two commands and shutdown cleanup", () => {
+test("extension registers three commands and shutdown cleanup", () => {
   const commands = [];
   const events = [];
 
-  extension.default({ registerCommand: (name) => commands.push(name), on: (name) => events.push(name) });
+  extension.default({ registerCommand: (name) => commands.push(name), on: (name) => events.push(name), registerTool: () => {} });
 
-  assert.deepEqual(commands, ["reviewers", "researchers"]);
+  assert.deepEqual(commands, ["reviewers", "researchers", "implementer"]);
   assert.deepEqual(events, ["session_shutdown"]);
 });
 
@@ -494,7 +664,7 @@ test("Pi's real loader loads the installed TypeScript entrypoint", async () => {
   const loaded = loader.getExtensions();
   assert.deepEqual(loaded.errors, []);
   assert.equal(loaded.extensions.length, 1);
-  assert.deepEqual([...loaded.extensions[0].commands.keys()], ["reviewers", "researchers"]);
+  assert.deepEqual([...loaded.extensions[0].commands.keys()], ["reviewers", "researchers", "implementer"]);
   const reviewers = loaded.extensions[0].commands.get("reviewers");
   assert.deepEqual((await reviewers.getArgumentCompletions("pe")).map((item) => item.value), ["peek"]);
 });
@@ -509,7 +679,7 @@ async function waitFor(predicate) {
 }
 
 /** Capture command and widget behavior without taking ownership of a terminal. */
-function commandHarness(service) {
+function commandHarness(service, options = {}) {
   const previous = process.env.PI_CODING_AGENT_DIR;
   const realAgentDir = core.getAgentDir();
   const agentDir = fixture();
@@ -523,7 +693,58 @@ function commandHarness(service) {
   const selections = [];
   const peeks = [];
   let menuCount = 0;
+  const registeredTools = new Map();
+  const startupMessages = [];
+  const parentCalls = [];
+  let parent;
+  let bootstrap;
+  let blocked = false;
+  let permissionCommand;
   extension.default({
+    registerTool: (tool) => registeredTools.set(tool.name, tool),
+    getActiveTools: () => [...registeredTools.keys()],
+    getSettings: () => ({ retry: { enabled: false }, compaction: { enabled: false } }),
+    sendUserMessage: (message) => {
+      startupMessages.push(message);
+      if (options.manualStartup) return;
+      bootstrap = (async () => {
+        const loader = new core.DefaultResourceLoader({
+          cwd: context.cwd, agentDir, settingsManager: core.SettingsManager.inMemory({}),
+          noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
+          systemPromptOverride: () => "Parent effective instructions: preserve unrelated changes.",
+          additionalExtensionPaths: [new URL("../../permission-gate.ts", import.meta.url).pathname],
+          extensionFactories: [(pi) => {
+            pi.on("tool_call", (event) => {
+              parentCalls.push(event.toolName);
+              if (blocked && ["write", "edit", "bash"].includes(event.toolName)) return { block: true, reason: "Parent plan mode denies mutations" };
+            });
+            pi.on("tool_result", (event) => {
+              if (event.toolName === "fixture_mcp") return { content: [{ type: "text", text: "filtered by parent hook" }] };
+            });
+          }],
+        });
+        await loader.reload();
+        assert.deepEqual(loader.getExtensions().errors, []);
+        permissionCommand = loader.getExtensions().extensions.find((item) => item.commands.has("permissions")).commands.get("permissions");
+        await permissionCommand.handler("fullAuto", context);
+        ({ session: parent } = await core.createAgentSession({ cwd: context.cwd, model: service.model,
+          modelRuntime: service.runtime, resourceLoader: loader, sessionManager: core.SessionManager.inMemory(context.cwd),
+          tools: ["read", "grep", "find", "ls", "bash", "edit", "write", "fixture_mcp"],
+          customTools: [core.defineTool({ name: "fixture_mcp", label: "Fixture MCP", description: "External fixture capability",
+            parameters: { type: "object", properties: {}, additionalProperties: false },
+            execute: async () => ({ content: [{ type: "text", text: "external result" }], details: undefined }) })],
+        }));
+        await parent.bindExtensions({ mode: "print" });
+        parent.sessionManager.appendMessage({ role: "assistant", content: [{ type: "text", text: "Starting authorized implementation" }],
+          api: "openai-completions", provider: service.model.provider, model: service.model.id,
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "stop", timestamp: Date.now() });
+        parent.refreshContext();
+        const token = JSON.parse(message.match(/with token ("[^"]+")/)[1]);
+        await registeredTools.get("mini_agents_start_implementer").execute("bootstrap", { token }, undefined, undefined,
+          parent.extensionRunner.createToolContext("bootstrap", undefined));
+      })().catch((error) => notifications.push({ message: String(error), level: "error" }));
+    },
     on: (name, handler) => events.set(name, handler), registerCommand: (name, command) => commands.set(name, command),
     sendMessage: (message, options) => { reports.push(message); assert.equal(options.triggerTurn, false); },
   });
@@ -533,11 +754,14 @@ function commandHarness(service) {
     getSystemPromptOptions: () => ({ cwd: context.cwd, skills: [] }),
     ui: {
       notify: (message, level) => notifications.push({ message, level }),
+      confirm: async () => true,
+      setStatus: () => {},
       select: async (title, options) => { selections.push({ title, options }); return "All"; },
       setWidget: (_key, factory) => {
         widgets.push(factory);
         if (!factory) return;
         const component = factory({}, { fg: (_color, text) => text });
+        if (_key === "mini-agents-peek") peeks.push(component.render(80));
         assert.equal(component.handleInput, undefined, "Progress must not capture keyboard input");
         for (const width of [8, 40, 100]) {
           for (const line of component.render(width)) assert.ok(visibleWidth(line) <= width);
@@ -566,9 +790,15 @@ function commandHarness(service) {
     },
   };
   return { commands, events, context, reports, notifications, widgets, selections, peeks, agentDir,
+    registeredTools, startupMessages, parentCalls,
+    set blocked(value) { blocked = value; },
+    get parent() { return parent; },
+    setPermissionMode: (mode) => permissionCommand.handler(mode, context),
     get menuCount() { return menuCount; },
     async close() {
       await events.get("session_shutdown")();
+      await bootstrap;
+      parent?.dispose();
       if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previous;
       await service.close();
@@ -660,7 +890,8 @@ test("peek always asks which job, and closing it leaves the agent running", asyn
 
     assert.equal(harness.selections.length, 1, "Even a single job is chosen explicitly");
     assert.match(harness.selections[0].options[0], /^#1 reviewer/);
-    assert.match(harness.peeks[0][0], /#1 review · reviewer · mini-fixture\/fixture/);
+    assert.match(harness.peeks[0][0], /#1 reviewer/);
+    await harness.commands.get("reviewers").handler("peek close", harness.context);
     await new Promise((resolve) => setTimeout(resolve, 100));
     assert.equal(harness.reports.length, 0, "Closing the peek must not end the run");
     assert.notEqual(harness.widgets.at(-1), undefined, "The run should still be in progress");
@@ -670,7 +901,7 @@ test("peek always asks which job, and closing it leaves the agent running", asyn
     await harness.commands.get("researchers").handler("peek", harness.context);
 
     assert.deepEqual(harness.selections[1].options.map((option) => option.split(" · ")[0]), ["#2 sources", "#2 countercheck"]);
-    assert.match(harness.peeks[1][0], /#2 research · countercheck/);
+    assert.match(harness.peeks.at(-1)[0], /#2 countercheck/);
     assert.equal(harness.reports.length, 0);
   } finally { await harness.close(); }
 });

@@ -6,7 +6,7 @@ Install a macOS development environment and distribute Pi skills and extensions 
 
 ## Scope and Assumptions
 
-Verified on 2026-10-11 against `README.md`, installer entry points, and the Codex accounts extension. This document describes installer boundaries and the Codex subsystem; it does not audit every bundled extension. Codex integration targets Pi 1.1.0 and Node 22. No `src/` directory or `pyproject.toml` was found; entry points are Bash scripts and Pi extension factories.
+Verified on 2026-10-11 against `README.md`, installer entry points, and the Codex accounts extension. This document describes installer boundaries and the Codex subsystem; it does not audit every bundled extension. Mini-agents boundaries were verified on 2026-10-12. Codex integration targets Pi 1.1.0 and Node 22. No `src/` directory or `pyproject.toml` was found; entry points are Bash scripts and Pi extension factories.
 
 ## System Overview
 
@@ -49,6 +49,14 @@ flowchart TD
 - `store.ts` reads credentials, discovers account identities and writes metadata only. It imports Pi credential types but does not own OAuth.
 - `usage.ts` parses quotas, calculates availability and fetches the usage endpoint. It depends on store types.
 - `ui.ts` formats picker rows, footer text, reports and command completions. It depends on store types and quota calculations, not network or credential writes.
+
+### Background mini-agents
+
+`pi-extensions/extensions/mini-agents/index.ts` registers `/reviewers`, `/researchers`, and `/implementer`. It owns in-memory child sessions, explicit tool sets, per-workflow model defaults, run timeouts, and report/log persistence. Children inherit enabled skills and discover repository instructions through Pi's resource loader. Researchers additionally load pi-web-access. Reviewers additionally expose `github_data` from `pi-extensions/extensions/mini-agents/github.ts`, a fixed authenticated gh read boundary for PR comments, reviews, resolution/outdated status, checks, and Actions runs/jobs/logs. Remote evidence is live while source reads remain pinned. REST collections and review threads are paginated; thread comment summaries flag truncation and full inline history is available separately. Reviewers and researchers remain read-only. The implementer has no standalone built-in tools. Its custom tool definitions proxy the parent's callable tools through `ExtensionToolContext.executeTool`, with a local cancellable `ask_user` tool for questions. It inherits the parent's effective system instructions and settings. Hidden and model-only tools cannot be proxied.
+
+Peek uses an above-editor widget that never captures keyboard input. An explicit full-log command opens a focused scrollable overlay. Questions wait on a cancellable promise and notify the parent; `/implementer reply` resolves the tool result in the child, not the parent's conversation. Completion posts a report without triggering a parent turn. Session shutdown aborts children and pending questions and clears widgets and timers.
+
+The implementer requires confirmation and only one may run per session. It shares the current checkout with the parent, without worktree isolation or rollback. A main-session startup turn obtains the checked parent executor through the model-only `mini_agents_start_implementer` tool. The command creates a one-use authorization token; pending startup expires after one minute and can be cancelled. If the parent is busy, startup queues after its current turn. Parent tool validation, permission mode, approvals, custom/MCP capabilities, and result hooks remain live rather than being recreated in a child. A missing parent executor fails closed. Shutdown invalidates the captured context and aborts the run. Users must coordinate file edits and review changes. The execution timeout includes question waiting time.
 
 ## External Integrations
 
