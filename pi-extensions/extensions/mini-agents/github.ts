@@ -14,6 +14,63 @@ export interface PrSnapshot {
   diffPath: string;
 }
 interface PrMetadata extends Omit<PrSnapshot, "url" | "diffPath"> { files: number }
+
+export type GithubDataKind = "comments" | "reviews" | "threads" | "checks" | "runs" | "jobs" | "logs";
+
+/** Fixed authenticated remote reads. No arbitrary endpoint, query, or shell access. */
+export async function readGithubData(
+  target: string, kind: GithubDataKind, runId?: number, offset = 1, limit = 200,
+  signal?: AbortSignal, cwd?: string, read: GithubRead = githubRead,
+): Promise<string> {
+  const pr = prTarget(target);
+  if (!pr) throw new Error("Provide a GitHub PR URL.");
+  if (!Number.isInteger(offset) || offset < 1 || !Number.isInteger(limit) || limit < 1 || limit > 2000) {
+    throw new Error("Use an offset of at least 1 and a limit between 1 and 2000.");
+  }
+  const [, owner, repo, , number] = new URL(pr.url).pathname.split("/");
+  const root = `repos/${owner}/${repo}`;
+  const get = (endpoint: string): Promise<string> => read(["api", "--hostname", "github.com", "--method", "GET", endpoint, "--paginate"], signal, cwd);
+  let text: string;
+  switch (kind) {
+    case "comments":
+      text = `Conversation comments:\n${await get(`${root}/issues/${number}/comments?per_page=100`)}\nInline review comments:\n${await get(`${pr.endpoint}/comments?per_page=100`)}`;
+      break;
+    case "reviews": text = await get(`${pr.endpoint}/reviews?per_page=100`); break;
+    case "threads": {
+      const query = `query($owner:String!,$repo:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated path line comments(first:100){pageInfo{hasNextPage endCursor} nodes{databaseId body url author{login} createdAt}}}}}}}`;
+      text = await read(["api", "--hostname", "github.com", "graphql", "--paginate", "-f", `query=${query}`,
+        "-f", `owner=${owner}`, "-f", `repo=${repo}`, "-F", `number=${number}`], signal, cwd);
+      break;
+    }
+    case "checks": {
+      const metadata = (await read(["api", "--hostname", "github.com", "--method", "GET", pr.endpoint, "--jq", ".head.sha"], signal, cwd)).trim();
+      if (typeof metadata !== "string" || !/^[a-f0-9]{40}$/.test(metadata)) throw new Error("Invalid PR head SHA.");
+      text = `Check runs:\n${await get(`${root}/commits/${metadata}/check-runs?per_page=100`)}\nCommit statuses:\n${await get(`${root}/commits/${metadata}/statuses?per_page=100`)}`;
+      break;
+    }
+    case "runs": {
+      const sha = (await read(["pr", "view", pr.url, "--json", "headRefOid", "--jq", ".headRefOid"], signal, cwd)).trim();
+      if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error("Invalid PR head SHA.");
+      text = await get(`${root}/actions/runs?head_sha=${sha}&per_page=100`);
+      break;
+    }
+    case "jobs":
+    case "logs":
+      if (!Number.isSafeInteger(runId) || !runId || runId < 1) throw new Error("Provide a positive Actions run ID.");
+      text = kind === "jobs" ? await get(`${root}/actions/runs/${runId}/jobs?per_page=100`)
+        : await read(["run", "view", String(runId), "--repo", `${owner}/${repo}`, "--log"], signal, cwd);
+      break;
+    default: throw new Error("Unsupported GitHub read operation.");
+  }
+  // Pretty-print each paginated JSON document so excerpts do not cut a huge single line.
+  text = text.replace(/^(\{.*\}|\[.*\])$/gm, (line) => {
+    try { return JSON.stringify(JSON.parse(line), null, 2); } catch { return line; }
+  });
+  const lines = text.split("\n");
+  const excerpt = lines.slice(offset - 1, offset - 1 + limit).join("\n");
+  if (Buffer.byteLength(excerpt) > 50 * 1024) throw new Error("GitHub excerpt exceeds 50 KiB; request fewer lines.");
+  return `Live GitHub ${kind} for ${pr.url}. Not pinned to the review snapshot.\nLines ${offset}-${Math.min(lines.length, offset + limit - 1)} of ${lines.length}; use offset/limit to continue.\n${excerpt}`;
+}
 export type GithubRead = (args: string[], signal?: AbortSignal, cwd?: string) => Promise<string>;
 const exec = promisify(execFile);
 const repoPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
