@@ -166,15 +166,14 @@ Same status lines and safe update tracking as the skills script. It also warns w
 - `/diff-review-web-stop` stops the localhost review server
 
 **Mini Agents**
-- `/reviewers <request>` runs a background code review, e.g. `/reviewers skipper review the current PR`
-- `/researchers <question>` runs two background researchers: one gathers sources, one looks for counterevidence
-- your skills drive the work: name the style you want, e.g. "skipper review" or "deep review"
-- PR URL, "current PR", or "PR #n" reviews the committed PR through `gh`, without checking it out
-- reviews and research run concurrently and post results to the chat when done
-- `--context` adds the current conversation as background; agents start fresh by default
-- subcommands: `model`, `peek` (live log), `stop`, `help`, with autocomplete
-- read-only: agents never edit files, run commands, or post to GitHub
-- needs `pi-web-access` for research and an authenticated `gh` for PR reviews; see `pi-extensions/extensions/mini-agents/README.md`
+- `/mini-agents <name>: <purpose>` starts a named background agent; the main model can create and manage the same agents with `mini_agents`
+- every agent appears in the UI with shared `list`, `peek`, `message`, `reply`, and `stop` controls
+- completed agents retain their conversation for follow-up messages
+- read-only by default; `--write` adds the parent's callable tools with live permission checks in the shared checkout
+- `--web` adds pi-web-access; `--pr` pins a committed PR snapshot through authenticated `gh`
+- `--context` includes the parent conversation; `model` saves one model default
+- your enabled skills drive the work; results and questions appear in the chat
+- replaces `/reviewers`, `/researchers` and `/implementer`; see `pi-extensions/extensions/mini-agents/README.md`
 
 ## After Setup
 

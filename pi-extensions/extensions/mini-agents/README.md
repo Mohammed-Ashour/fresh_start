@@ -1,80 +1,85 @@
-# Mini agents
+# Mini-agents
 
-Background reviewers, researchers, and an implementer for Pi. No added dependencies.
+Named background agents for Pi. Your main agent can create and manage them directly with `mini_agents`. You get the same UI controls whether you or the model starts them. No added dependencies.
 
 ## Use
 
-Run `/reload` in Pi or restart it.
+Install this extension, then `/reload` or restart Pi. `/mini-agents` replaces `/reviewers`, `/researchers`, and `/implementer`.
 
 ```text
-/reviewers skipper review the current PR
-/reviewers deep review https://github.com/Hydrosat/hywater-pipelines/pull/368
-/reviewers check test coverage of src/hydrosat/hywater/cli/shared/
-/reviewers                      # prompt; blank reviews uncommitted changes
-/researchers Compare pytest fixture scopes
-/implementer --context add tests for the parser
-/implementer reply Use the existing pytest fixtures
+/mini-agents review: skipper review the current uncommitted changes
+/mini-agents --pr review: deep review https://github.com/owner/project/pull/368
+/mini-agents --web sources: compare pytest fixture scopes, cite primary sources
+/mini-agents --write --context parser: add the parser tests we discussed
+/mini-agents list
+/mini-agents peek 1
+/mini-agents message 1 also check validation failures
+/mini-agents reply 1 use the existing fixtures
+/mini-agents stop 1
 ```
 
-- `/reviewers help`, `/researchers help`: show all commands, usage tips, the saved model, and active runs.
-- `/reviewers model`, `/researchers model`: search for and save each workflow's model.
-- `/reviewers stop`, `/researchers stop`: cancel a run. With several runs, pick one or All.
-- `/reviewers peek`, `/researchers peek`, `/implementer peek`: pick a job and show its last eight log lines in a live panel above the editor. You can keep typing and using your main session. The panel stays visible after completion.
-- `/<command> peek close`: close the panel without stopping the job.
-- `/<command> peek log`: open the full scrollable log of an active job. `↑↓`/PgUp/PgDn scroll, End follows, Esc or `q` returns to your session.
-- `/implementer reply [answer]`: answer the implementer's pending question. Without an answer, opens an input prompt. Questions notify you and pause the child without opening a dialog automatically.
+Give each agent a name and purpose, separated by a colon. Roles are instructions, not separate types. Start two agents yourself or ask the main model to gather sources and countercheck them independently.
 
-`/implementer` also supports `model`, `help`, `stop`, and `--context`. Starting asks for confirmation because it can edit, write, and run shell commands in your current checkout. Only one implementer can run at a time. Avoid editing the same files from the main session. The implementer calls the main session's live tool executor, including its permission and result hooks. Callable custom and MCP tools are available through the same boundary. Changing `/permissions` also affects the running implementer. Disabled or removed tools remain unavailable; there is no fallback to unrestricted child tools. Cancellation stops further work but does not undo edits. Review its changes before committing.
+Options:
+- Read-only by default, with file reads, Git diffs, GitHub evidence and `ask_user`.
+- `--write` adds the parent's callable tools through its live permission checks. Manual starts ask for confirmation.
+- `--web` loads installed `pi-web-access` tools.
+- `--pr` saves and verifies a committed PR snapshot, then adds pinned head/base file reads. Include a PR URL, PR number, or "current PR" in the purpose. Without this option, no automatic PR snapshot is fetched.
+- `--context` includes the latest 60k characters of readable parent conversation, excluding tool output. Otherwise agents start with a fresh conversation. Children see the enabled skills and discover AGENTS.md normally. Writable children also inherit the parent's effective instructions and settings.
 
-Reviewer and researcher runs start in the background and return control immediately. Implementer startup requests a short main-session turn to call `mini_agents_start_implementer` with a one-use token. If the parent is busy, startup queues after its current turn. The startup tool must be enabled in your tool configuration. Startup expires after one minute if the tool has not been called; retry the command if needed. Once started, implementation runs in the background. Reviews and research can run at the same time, as many as you like. One widget above the editor shows every active job:
+## UI and controls
 
-```text
-● #1 review · reviewer        1m 4s  Using pr_file
-● #2 research · sources         12s  Using web_search
-● #2 research · countercheck    12s  Thinking
+Every active agent appears above the editor with its ID, name, purpose, elapsed time and activity. Progress widgets never capture keyboard input.
+
+- `/mini-agents list` includes completed agents and pending questions.
+- `/mini-agents peek [id]` shows the last eight log lines in a live panel. Without an ID, pick an agent. Completed agents can still be inspected.
+- `/mini-agents peek close` closes the panel without stopping the agent.
+- `/mini-agents peek log [id]` opens the full retained scrollable log. Arrows/PgUp/PgDn scroll, End follows, Esc or `q` closes.
+- `/mini-agents message <id> <text>` queues a message after current work or resumes a completed agent's existing conversation. If it is waiting for an answer, the message answers that question instead.
+- `/mini-agents reply <id> [answer]` answers a pending question, prompting for text if omitted. Questions notify the user and appear in the parent conversation without opening a modal.
+- `/mini-agents stop [id]` cancels work and closes the child's session. Without an ID, pick an agent. `stop all` closes all agents. Cancellation does not undo edits.
+- `/mini-agents model` saves one model default. Otherwise new agents use the current parent model. Old per-role settings remain in the settings file but are no longer used.
+- `/mini-agents help` shows syntax. Subcommands and flags autocomplete.
+
+Results and questions appear in the parent chat without triggering a model turn. The main model can poll `status` or `list` on its next turn. Completed agents retain their conversation until stopped or the parent closes. Failed or stopped agents cannot resume; start another one.
+
+## Model tool
+
+One model-only tool, `mini_agents`, supports:
+
+```json
+{"action":"start","name":"coverage","purpose":"Check parser scenario coverage","context":true}
+{"action":"start","name":"builder","purpose":"Add parser tests","readOnly":false,"tools":["read","edit","write","bash"]}
+{"action":"list"}
+{"action":"status","id":1}
+{"action":"message","id":1,"message":"Focus on invalid inputs"}
+{"action":"stop","id":1}
 ```
 
-Each run posts its result to the conversation when it finishes. Results do not trigger a parent model turn.
+Start returns an ID immediately. Optional `model` is a `provider/model-id`; `web` and `pr` correspond to command flags. `tools` limits parent-proxied tools and requires `readOnly: false`. Fixed read-only helpers, web tools when requested, and `ask_user` remain available. Status includes purpose, state, activity, question, bounded output, recent log lines and report path.
 
-Type `/reviewers ` or `/researchers ` to autocomplete `model`, `peek`, `stop`, `help`, and `--context`.
+Model-created writable agents use the tool call's checked parent executor directly. Manual writable startup queues a main-session call to the same tool with a stored, one-use token. Enable `mini_agents` in the parent tool configuration. Queued startup is visible and cancellable, and expires after one minute. Children cannot call this model-only management tool or recursively delegate through the nested executor.
 
-## Context
+## Workspace and permissions
 
-Agents start with a fresh conversation by default. They see your request, skills, and AGENTS.md, not this chat. The implementer also inherits the parent's effective system instructions and settings. Add `--context` anywhere in the request to include the current conversation as background:
+Each agent captures its launch directory, Git branch and commit. Relative paths, resource discovery and GitHub PR resolution use that directory, including after queued startup. Detached HEAD, unborn branches and unavailable Git state are explicit. A writable child rejects an executor from a different directory.
 
-```text
-/reviewers --context skipper review the current PR, focus on what we discussed
-/researchers --context is this approach standard?
-```
+Writable agents share the current checkout with the parent. Only one writable agent can be active at a time, including queued startup and question waiting. Completed writers can resume only when no other writer is active. There is no worktree isolation, branch lock or rollback. Avoid simultaneous edits to the same files and review changes before committing.
 
-Included: user and assistant messages, earlier agent results, and compaction summaries. Tool output is left out, and only the latest 60k characters are kept. The result notes when context was included.
+Parent-proxied tools keep validation, permission mode, approvals and result hooks live. Callable custom/MCP tools are included unless limited with `tools`; hidden and model-only tools are excluded. Removed or disabled tools fail rather than falling back to unrestricted implementations. Fixed read-only helpers and optional web tools run locally in the child. Tool restrictions are not an OS sandbox; files read by a child go to its model provider.
 
-## Skills
+PR snapshots use authenticated `gh`, without checking out or fetching refs. `pr_file` pins source to the saved head/base commits, including forks. `github_data` reads live comments, reviews, resolution/outdated status, checks and Actions jobs/logs, including Copilot feedback. Collections paginate; thread summaries cap comments at 100 and flag incomplete threads. Full inline history is available through comments. These reads cannot post, resolve threads or rerun pipelines. Remote evidence is live, not pinned to the saved diff.
 
-Children see the exact skills enabled in your session, and AGENTS.md files load as usual. Nothing is preloaded: the reviewer reads your request, picks the skills that fit (`skipper review` → `skipper-review`, `deep review` → `skipper-review-deep`), and follows their workflow and output format. Researchers do the same.
+## Storage and limits
 
-Reviewers and researchers have read-only tools. When a skill calls for running tests, editing, or delegating, they skip that step and say so. The implementer proxies the parent's callable tools and adds `ask_user`. Hidden and model-only tools are not callable through Pi's nested executor, so they are excluded. Use `ask_user` for questions instead. The startup tool is model-only and requires a live user-created token, so the child cannot recursively start another implementer. Permission approval dialogs still use the main UI, just as they do for main-session calls.
+Reports and logs live under `~/.pi/agent/mini-agents-runs/`; model settings use `~/.pi/agent/mini-agents-models.json`. Follow-ups update that agent's report and append to its bounded log. Only the last 500 log entries are retained. Delete old run directories manually.
 
-## PR reviews
-
-A PR URL, "current PR", "this PR", or "PR #368" reviews the committed PR, not your working tree. The current branch and PR numbers resolve with `gh pr view` from the project directory. Requires an authenticated `gh` CLI.
-
-The extension saves the diff once, verifies the revision and file count, and gives the reviewer a `pr_file` tool pinned to the PR head and base commits, including forks. It never checks out branches, fetches refs, or posts to GitHub.
-
-Reviewers also have `github_data`, using your authenticated `gh` CLI to read conversation and inline comments, reviews, review-thread resolution and outdated status, commit checks/statuses, Actions runs, jobs, and logs. This includes Copilot comments. REST collections and review threads are paginated; thread summaries include up to 100 comments per thread and flag incomplete threads. Full inline history is available through the comments operation. Large responses use line offsets and limits. These reads are live, not pinned to the saved diff. Authentication and permission errors are reported rather than treated as missing feedback. No arbitrary API queries, posting, thread resolution, or pipeline reruns are allowed.
-
-## Files and limits
-
-Reports, per-job logs, and PR diffs are saved under `~/.pi/agent/mini-agents-runs/`; each result links its report and log folder. Delete old runs manually. Model defaults live in `~/.pi/agent/mini-agents-models.json`.
-
-Runs stop after 30 minutes, including time spent waiting for replies. Closing, reloading, or switching sessions cancels active runs and saves partial results without posting them to another session. Child token usage is not added to the parent's cost totals.
-
-Tool restrictions are not an OS sandbox. Files the child reads go to the selected model provider.
+Each execution times out after 30 minutes, including question waiting. Idle completed agents do not time out. Reload, session switch and shutdown close all children, invalidate queued tokens and suppress cross-session results. Live handles and IDs are session-local and are not restored after reload. Child token costs are not added to the parent's totals.
 
 ## Test
 
 ```bash
-node --test ~/.pi/agent/extensions/mini-agents/tests/*.test.mjs
+node --test pi-extensions/extensions/mini-agents/tests/*.test.mjs
 ```
 
-Uses a local fake model server and mocked GitHub reads. Set `PI_BIN` if Pi is not at `/opt/homebrew/bin/pi`.
+Tests use Pi's installed SDK, local fake model servers and mocked GitHub reads. Set `PI_BIN` if Pi is not at `/opt/homebrew/bin/pi`. Terminal rendering still needs an interactive check.
