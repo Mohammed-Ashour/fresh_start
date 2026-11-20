@@ -6,7 +6,7 @@ Install a macOS development environment and distribute Pi skills and extensions 
 
 ## Scope and Assumptions
 
-Verified on 2026-10-11 against `README.md`, installer entry points, and the Codex accounts extension. This document describes installer boundaries and the Codex subsystem; it does not audit every bundled extension. Codex integration targets Pi 1.1.0 and Node 22. No `src/` directory or `pyproject.toml` was found; entry points are Bash scripts and Pi extension factories.
+Verified on 2026-10-11 against `README.md`, installer entry points, and the Codex accounts extension. This document describes installer boundaries and the Codex subsystem; it does not audit every bundled extension. Mini-agents boundaries were verified on 2026-10-26. Codex integration targets Pi 1.1.0 and Node 22. No `src/` directory or `pyproject.toml` was found; entry points are Bash scripts and Pi extension factories.
 
 ## System Overview
 
@@ -49,6 +49,18 @@ flowchart TD
 - `store.ts` reads credentials, discovers account identities and writes metadata only. It imports Pi credential types but does not own OAuth.
 - `usage.ts` parses quotas, calculates availability and fetches the usage endpoint. It depends on store types.
 - `ui.ts` formats picker rows, footer text, reports and command completions. It depends on store types and quota calculations, not network or credential writes.
+
+### Background mini-agents
+
+`pi-extensions/extensions/mini-agents/index.ts` registers one `/mini-agents` command and one model-only `mini_agents` management tool. Both create the same session-local agent records with stable IDs, names, purposes, capability options, state, questions, and report paths. Separate reviewer/researcher/implementer types and per-role model defaults are replaced by read-only defaults and optional parent tools, web access, pinned PR snapshots, model selection and conversation context. Enabled skills are captured from the parent command or pre-run event; children discover repository instructions through Pi's resource loader.
+
+Each agent captures its launch cwd, branch and commit. Resource discovery, tool paths and GitHub resolution use the launch directory, including after queued startup. Writable children reject parent executors from another directory. Optional PR snapshots and fixed authenticated GitHub reads remain in `pi-extensions/extensions/mini-agents/github.ts`. Snapshot source reads are pinned; comments, reviews, thread status, checks and Actions evidence are live and paginated. Optional web access loads installed pi-web-access. These fixed read-only helpers execute locally in the child.
+
+Read-only children expose explicit file/evidence tools and a cancellable `ask_user`. Writable children additionally proxy the parent's callable tools through `ExtensionToolContext.executeTool`, retaining live validation, permission checks and result hooks. An optional tool-name allowlist limits these proxies. Hidden/model-only tools are excluded, including the management tool, so children cannot recursively delegate through it. Writable children inherit the parent's effective system instructions and settings. Missing executors fail closed. Tool restrictions are not an OS sandbox.
+
+Model-created agents capture the checked executor directly from the management call. Manual writable starts require confirmation and obtain it through a queued call to that same tool using a one-use token. Pending startup is visible, cancellable and expires after one minute. Only one writer can be active, including queued startup and question waiting. All writers share the checkout with the parent, without isolation, branch locking or rollback.
+
+Active agents share an above-editor progress widget. Peek uses a non-focus-taking panel or an explicit scrollable overlay, including for completed agents. Both user commands and model tool actions can list, inspect, message and stop agents. Messages answer pending questions, queue behind current work, or resume a completed conversation. Completed child sessions remain in memory until stopped or parent shutdown; failed/stopped children cannot resume. Reports and bounded logs persist per agent. Results and questions enter the parent conversation without triggering a model turn. Every execution has a 30-minute timeout including question waiting. Shutdown closes children and pending questions, invalidates startup tokens, clears UI/timers and suppresses cross-session messages. Live records are not restored after reload.
 
 ## External Integrations
 

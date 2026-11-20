@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { parsePrMetadata, prTarget, readGithubPr, readPrFile } from "../github.ts";
+import { parsePrMetadata, prTarget, readGithubData, readGithubPr, readPrFile } from "../github.ts";
 
 const directory = mkdtempSync(join(tmpdir(), "mini-agents-github-test-"));
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -13,6 +13,59 @@ const head = "b".repeat(40);
 const metadata = JSON.stringify(["PR title", "PR body", base, head, "owner/project", "fork/project", 1]);
 const diff = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n@@ -1 +1 @@\n-old\n+new\n";
 const snapshot = { ...parsePrMetadata(metadata), url, diffPath: "/tmp/pr.diff" };
+
+test("GitHub comments and threads retrieve Copilot feedback and resolution with fixed reads", async () => {
+  const calls = [];
+  const read = async (args, signal, cwd) => {
+    calls.push({ args, signal, cwd });
+    return JSON.stringify({ author: { login: "copilot-pull-request-reviewer" }, body: "Fix this", isResolved: false });
+  };
+  const signal = new AbortController().signal;
+  const comments = await readGithubData(url, "comments", undefined, 1, 200, signal, "/project", read);
+  assert.match(comments, /copilot/);
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.ok(call.args.includes("GET"));
+    assert.ok(call.args.includes("--paginate"));
+    assert.equal(call.signal, signal);
+    assert.equal(call.cwd, "/project");
+  }
+  const threads = await readGithubData(url, "threads", undefined, 1, 200, signal, "/project", read);
+  assert.match(threads, /isResolved/);
+  const query = calls.at(-1).args.find((arg) => arg.startsWith("query="));
+  assert.match(query, /isResolved isOutdated/);
+  assert.match(query, /after:\$endCursor/);
+  assert.ok(!query.includes("mutation"));
+});
+
+test("GitHub checks, runs, jobs and logs use fixed repository-scoped operations", async () => {
+  const calls = [];
+  const read = async (args) => {
+    calls.push(args);
+    if (args.includes(".head.sha") || args.includes(".headRefOid")) return head + "\n";
+    return '{"result":"CI evidence"}';
+  };
+  for (const kind of ["reviews", "checks", "runs", "jobs", "logs"]) {
+    assert.match(await readGithubData(url, kind, 42, 1, 200, undefined, "/project", read), /CI evidence/);
+  }
+  assert.ok(calls.some((args) => args.includes(`repos/owner/project/commits/${head}/check-runs?per_page=100`)));
+  assert.ok(calls.some((args) => args.includes(`repos/owner/project/actions/runs?head_sha=${head}&per_page=100`)));
+  assert.ok(calls.some((args) => args.includes("repos/owner/project/actions/runs/42/jobs?per_page=100")));
+  assert.deepEqual(calls.at(-1), ["run", "view", "42", "--repo", "owner/project", "--log"]);
+});
+
+test("GitHub reads validate requests, bound output and expose authentication errors", async () => {
+  const read = async () => "a\nb\nc\nd";
+  assert.match(await readGithubData(url, "logs", 42, 2, 2, undefined, undefined, read), /Lines 2-3 of 4[\s\S]*b\nc$/);
+  for (const id of [undefined, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(readGithubData(url, "logs", id, 1, 200, undefined, undefined, read), /positive/);
+  }
+  await assert.rejects(readGithubData(url, "rerun", undefined, 1, 200, undefined, undefined, read), /Unsupported/);
+  await assert.rejects(readGithubData("https://evil.test/owner/project/pull/1", "comments", undefined, 1, 200, undefined, undefined, read), /PR URL/);
+  await assert.rejects(readGithubData(url, "reviews", undefined, 0, 200, undefined, undefined, read), /offset/);
+  await assert.rejects(readGithubData(url, "logs", 42, 1, 200, undefined, undefined, async () => "x".repeat(51000 * 2)), /50 KiB/);
+  await assert.rejects(readGithubData(url, "reviews", undefined, 1, 200, undefined, undefined, async () => { throw new Error("gh authentication failed"); }), /authentication/);
+});
 
 test("PR target resolves links in prose without mistaking them for working-tree reviews", () => {
   assert.deepEqual(prTarget(`Review ${url}/files please`), { url, endpoint: "repos/owner/project/pulls/368" });
