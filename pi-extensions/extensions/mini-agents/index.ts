@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFile
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 import {
   buildSessionContext, createAgentSession, DefaultResourceLoader, defineTool, getAgentDir,
   ModelRuntime, SessionManager, SettingsManager,

@@ -8,10 +8,15 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 
-let host = dirname(realpathSync(process.env.PI_BIN || "/opt/homebrew/bin/pi"));
+// Standalone Pi binaries do not contain importable SDK files. Point PI_PACKAGE_DIR
+// at an npm SDK installation when testing alongside a standalone binary.
+const binary = process.env.PI_BIN || (process.env.PATH || "").split(":")
+  .map((directory) => join(directory, "pi")).find(existsSync);
+if (!process.env.PI_PACKAGE_DIR && !binary) throw new Error("Set PI_PACKAGE_DIR to Pi's npm package or PI_BIN to its CLI.");
+let host = process.env.PI_PACKAGE_DIR || dirname(realpathSync(binary));
 while (!existsSync(join(host, "dist/index.js"))) {
   const parent = dirname(host);
-  if (parent === host) throw new Error("Cannot locate Pi's installed package");
+  if (parent === host) throw new Error("Cannot locate Pi's SDK. Set PI_PACKAGE_DIR to an npm installation of @earendil-works/pi-coding-agent.");
   host = parent;
 }
 const temporary = mkdtempSync(join(tmpdir(), "mini-agents-test-"));
@@ -19,14 +24,21 @@ after(() => rmSync(temporary, { recursive: true, force: true }));
 const corePath = join(host, "dist/index.js");
 const core = await import(pathToFileURL(corePath));
 const requirePi = createRequire(join(host, "package.json"));
+// Resolve from Pi's dependency search paths, including npm's hoisted layout.
+const dependencyPath = (name) => {
+  const path = requirePi.resolve.paths(name).map((base) => join(base, name, "dist/index.js")).find(existsSync);
+  if (!path) throw new Error(`Cannot locate Pi dependency ${name}`);
+  return path;
+};
 const { createJiti } = requirePi("jiti");
 const jiti = createJiti(import.meta.url, { moduleCache: false, alias: {
+  typebox: requirePi.resolve("typebox"),
   "@earendil-works/pi-coding-agent": corePath,
-  "@earendil-works/pi-ai": join(host, "node_modules/@earendil-works/pi-ai/dist/index.js"),
-  "@earendil-works/pi-tui": join(host, "node_modules/@earendil-works/pi-tui/dist/index.js"),
+  "@earendil-works/pi-ai": dependencyPath("@earendil-works/pi-ai"),
+  "@earendil-works/pi-tui": dependencyPath("@earendil-works/pi-tui"),
 } });
 const extension = await jiti.import(new URL("../index.ts", import.meta.url).pathname);
-const { visibleWidth } = await import(pathToFileURL(join(host, "node_modules/@earendil-works/pi-tui/dist/index.js")));
+const { visibleWidth } = await import(pathToFileURL(dependencyPath("@earendil-works/pi-tui")));
 
 /** Create a private fixture folder for one test. */
 function fixture() { return mkdtempSync(join(temporary, "case-")); }
@@ -270,7 +282,7 @@ test("model menu searches model IDs and providers case-insensitively", () => {
 });
 
 test("model menu supports navigation, backspace, no matches, and cancellation", async () => {
-  const { visibleWidth } = await import(pathToFileURL(join(host, "node_modules/@earendil-works/pi-tui/dist/index.js")));
+  const { visibleWidth } = await import(pathToFileURL(dependencyPath("@earendil-works/pi-tui")));
   const selected = [];
   const menu = extension.createSearchMenu("Models", items(["custom/alpha", "custom/beta"]),
     { fg: (_color, text) => text }, (id) => selected.push(id), () => {});

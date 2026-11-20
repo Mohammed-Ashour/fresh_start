@@ -82,4 +82,4 @@ Each execution times out after 30 minutes, including question waiting. Idle comp
 node --test pi-extensions/extensions/mini-agents/tests/*.test.mjs
 ```
 
-Tests use Pi's installed SDK, local fake model servers and mocked GitHub reads. Set `PI_BIN` if Pi is not at `/opt/homebrew/bin/pi`. Terminal rendering still needs an interactive check.
+Tests use Pi's installed SDK, local fake model servers and mocked GitHub reads. They find the npm installation through `pi` on PATH, or an explicit `PI_BIN`. For standalone Pi installations, install the matching `@earendil-works/pi-coding-agent` npm version into a temporary directory and set `PI_PACKAGE_DIR` to that package directory. Nested and hoisted npm dependencies are supported. Optional web integration tests skip when pi-web-access is absent. Terminal rendering still needs an interactive check.
