@@ -1,6 +1,6 @@
 ---
 name: mo-presentation
-description: Build Mohamed's presentations as story-driven, Excalidraw-style, graph-first, sourced decks in his voice, delivered as an editable PowerPoint (.pptx). Use this whenever he asks for a presentation, deck, slides, a talk, a tech talk, a design review deck, a pitch, or wants to turn a doc, blog post, RFC or notes into slides, even if he does not say PowerPoint.
+description: Build Mohamed's presentations as technical, story-driven, Excalidraw-style, sourced decks with purposeful visuals, delivered as an editable PowerPoint (.pptx). Use this whenever he asks for a presentation, deck, slides, a talk, a tech talk, a design review deck, a pitch, or wants to turn a doc, blog post, RFC or notes into slides, even if he does not say PowerPoint.
 ---
 
 # Mo presentation
@@ -13,7 +13,7 @@ If a pptx skill is available in the session, load it and use its build mechanics
 
 1. Collect the material first: what he gave you, plus research for anything that describes the outside world.
 2. Write the storyline as a list of slide titles. Check it reads as a story on its own before building anything.
-3. For each slide, pick the one visual that carries the idea.
+3. For each slide, decide whether a visual adds information. Use a chart, diagram or GIF only when it explains a comparison, mechanism or change; otherwise use a text-only slide.
 4. Write the text in his voice.
 5. Attach sources.
 6. Build the .pptx, render it, look at every slide, fix what is broken.
@@ -36,11 +36,12 @@ A deck is an argument told in order, not a container of topics. Default arc:
 9. Review: the final presented slide, all main points on one screen, the ones that must stick
 10. Sources and appendix, after the review, as backup slides
 
-Adapt the arc to the deck. A 5 slide update does not need all eight beats.
+Adapt the arc to the deck. A short update does not need every beat.
 
 Rules that make it a story:
 - One message per slide. If a slide needs two titles, it is two slides.
-- Titles are full statements that carry the message ("Reprocessing one field should not rerun the whole pipeline"), not labels ("Reprocessing"). Reading only the titles top to bottom should tell the whole story.
+- Titles state the technical finding, mechanism or constraint, rather than a topic label or a conversational punchline. Examples: "Deferral releases worker slots but adds a resume path" and "Pod disruption protection prevents node consolidation". Reading only the titles should explain the investigation in order.
+- Show the measured problem in the first one or two slides. For a capacity/latency mismatch, show both quantities together. Label schematic activity as illustrative; aggregate CPU measurements do not identify idle individual nodes or prove safe removable capacity.
 - Each slide should raise the question the next one answers.
 - Detail that supports but does not advance the story goes into speaker notes or an appendix.
 
@@ -49,26 +50,32 @@ Rules that make it a story:
 Keep it simple and calm. The slide supports the speaker, it does not replace him.
 
 - Title: one line, up to about 10 words.
-- Context line: every content slide gets one or two muted sentences right under the title, about 20 to 30 words. It gives the background: why this slide exists, what situation, assumption or earlier finding led here. The audience should know why they are looking at the visual before they read it. It does not repeat the title or the numbers.
-- Explanation panel: the text next to the visual follows the explanation template below. No free paragraphs.
-- Plain words. A smart person from another team should follow it.
-- Put the full explanation in speaker notes, written as he would say it out loud.
+- Context line: a short, muted scope statement under the title. Identify the system, configuration, measurement window or dependency boundary. Avoid conversational lead-ins, rhetorical questions and sentences that repeat the title.
+- Explanation: complete technical sentences on the left, following the structure below. Paragraphs are preferred over summary fragments.
+- Define unfamiliar terms and metrics before relying on them. Preserve exact configuration names and distinguish related concepts, such as CPU utilization versus allocatable capacity, and task pools versus node pools.
+- Put detailed evidence, additional qualifications and implementation references in speaker notes. Do not remove the explanation from the slide just to satisfy a tiny word budget.
 
-### Explanation template
+### Technical explanation structure
 
-Split the explanation into 2 or 3 labelled blocks, so the eye can jump to the part it needs. Each block is a small label and one short sentence, at most about 15 words. Pick the labels by slide type:
+For an engineering audience, explain what the component is, how it operates, and why the mechanism affects the measured result or proposed change.
 
-| Slide type | Blocks |
-|---|---|
-| Problem or finding | What we saw · Why it happens · What it means |
-| Change or fix | Change · Result · Caveat |
-| Proof or comparison | Result · How we measured · Caveat |
-| Plan or next step | Step · Why now · Expected gain |
-| How it works (technical background) | 1 · step, 2 · step, 3 · step... numbered to match the badges on the diagram |
+Use two or three short paragraphs, usually about 60 to 110 words in total. This is a guide, not a quota. If the explanation cannot fit comfortably, split it or move secondary details into notes rather than shrinking the font.
 
-- Labels: 9 to 10pt, all caps, muted. Text: 12 to 13pt, ink.
-- About 40 words in the whole panel. If it needs more, the extra goes into the notes.
-- Leave a caveat block out only when there really is no caveat.
+1. Define the component, metric or dependency and its role.
+2. Explain execution behavior or the causal mechanism. Name the actor and the operation.
+3. State the measured effect, limitation or operational prerequisite, including comparison scope where relevant.
+
+For a sequence, use numbered sentences that match the diagram's step badges. Every numbered badge must have a corresponding explanation step. A plan may be a numbered list without a diagram.
+
+Do not force text into labels such as "What we saw", "Why nodes stayed", "Different fixes" or "What it means". These produce summary notes instead of a technical explanation. Avoid mandatory all-caps mini-headings.
+
+Example:
+
+> Karpenter consolidation evaluates terminating or replacing nodes to reduce compute cost while preserving pod scheduling requirements.
+>
+> An active pod with `karpenter.sh/do-not-disrupt` excludes its node from consolidation. Frequent arrivals of protected pods can maintain this exclusion despite low CPU utilization.
+>
+> Removing protection permits more disruption and can cause retries. Memory, scratch-disk throughput and publication recovery must be evaluated before changing the policy.
 
 ### Show the command
 
@@ -86,10 +93,10 @@ Engineers trust a number more when they can see where it came from. Where possib
 
 ### His voice
 
-He writes like an experienced engineer talking to a colleague: plain, direct, practical, a bit sharp, grounded in what he has seen happen.
+For engineering presentations, use neutral, precise technical prose. The narrative comes from slide order; the sentences define mechanisms and explain causality rather than sound like a casual talk.
 
-- Short declarative sentences. Says the thing, then stops.
-- Talks to the audience as "you" and from experience as "I" or "we".
+- Use complete declarative sentences. Vary sentence length when needed to explain a condition or dependency.
+- Name the component and operation: "The triggerer polls pod status" rather than "We keep an eye on the pod". Use "I", "we" or "you" only when attribution or an instruction requires it, not as a default framing.
 - Concrete over abstract: names the requirement, the budget, the timeline, the failure, instead of talking about "challenges".
 - Honest about limits and context. "It depends" is allowed when followed by what it depends on.
 - Dry humor is fine when it comes naturally. Never forced.
@@ -98,7 +105,7 @@ He writes like an experienced engineer talking to a colleague: plain, direct, pr
 - No AI tells: "it's not X, it's Y" constructions, rule of three lists for rhythm, rhetorical question plus instant answer, "let's dive in", inflated significance.
 - No emojis unless he asks.
 
-If a humanizer or unslop skill is available, run the final slide text and notes through it as a last pass.
+If humanizer or unslop is available, apply it to slide text and notes as a final pass. Remove filler and artificial phrasing without replacing precise engineering language with conversational slogans or stripping out definitions and causal detail.
 
 ## Layout: golden ratio grid and templates
 
@@ -107,8 +114,9 @@ Every slide uses the same grid, so the eye always knows where to look. Values fo
 - Margins 0.6 in left and right. Content width about 12.1 in.
 - Header band: title at y 0.35, context line at y 1.0, both full width.
 - Content band: y 1.8 to 6.75.
-- Golden split of the content band: visual on the left 61.8% (about 7.3 in), gutter 0.35 in, explanation panel on the right 38.2% (about 4.5 in).
-- Inside the explanation panel, stack the blocks from the top and keep the command chip at the bottom.
+- Golden split of the content band: technical explanation on the left 38.2% (about 4.5 in), gutter 0.35 in, supporting GIF/chart/diagram on the right 61.8% (about 7.3 in). The explanation starts at x 0.6; the visual starts at about x 5.45.
+- Inside the left column, place the paragraphs from the top and the command chip at the bottom. Keep a clear gap between them.
+- When no visual adds information, use a text-only layout with a wider left-aligned body. Do not leave an empty visual placeholder or add decorative boxes to fill the space.
 - Source line at y 6.95, full width, only when the slide has linked sources.
 - A visual sits inside its zone with air around it. It never fills the zone edge to edge.
 
@@ -117,18 +125,20 @@ Build these as real slide layouts in the file, so he can add a slide in PowerPoi
 | Layout | Placeholders | Use for |
 |---|---|---|
 | Title | title, subtitle, footer line | first slide |
-| Visual + explanation | title, context, visual zone (61.8%), explanation (38.2%), command chip, source | most content slides |
-| Full visual | title, context, full width visual zone, one-line caption, source | wide diagrams, timelines, before/after sketches, charts with many categories |
+| Technical text + visual | title, context, explanation on left (38.2%), visual on right (61.8%), left-column command chip, source | slides where a visual explains the mechanism or evidence |
+| Technical explanation | title, context, wider left-aligned body, optional source | definitions, constraints or plans that do not benefit from a figure |
+| Full visual | title, context, full width visual zone, one-line caption, source | exceptions where a wide diagram or timeline genuinely requires the width |
 | Full visual, as takeaway grid | title, context, one row per takeaway (text 38.2%, GIF or chart 61.8%), caption | 1 slide, 2 at most |
 | Full visual, as review | title, context, 2 to 4 takeaway cards, a next-step strip | final presented slide |
 | Sources | title, numbered list | backup, after the review |
 
-- The explanation placeholder uses list level 1 for block labels and level 2 for block text, styled in the layout, so typing in it follows the template.
+- Explanation placeholders use normal body-text paragraphs, not an alternating all-caps-label/body template. Numbered paragraphs may correspond to diagram steps.
+- Rebuild visuals at their actual column dimensions instead of shrinking a wide figure and making its labels unreadable. Recheck GIF callout spacing throughout the transition, not just at the endpoints.
 - Remove the default layouts he will not use. Remove empty visual placeholders on generated slides after placing the chart or diagram.
 
 ## Graphs and diagrams
 
-Every content slide gets one visual that does the explaining. Choose by what the idea is:
+A visual is optional. Use one when it adds a comparison, spatial relationship, execution sequence or change that the text alone would not explain as clearly. Do not turn every definition into a chart or repeat the paragraph as a row of boxes. When a visual adds value, choose by what the idea is:
 
 | The idea is about | Use |
 |---|---|
@@ -145,7 +155,7 @@ Every content slide gets one visual that does the explaining. Choose by what the
 - Keep charts modest. A chart fills its zone with some air, never the whole slide. Chart text 10 to 11pt.
 - Diagrams are built from native shapes and connectors, never pasted as an image. Group the shapes of one diagram so it moves as a unit.
 - Maximum about 7 boxes per diagram. If it needs more, split it over two slides and build it up.
-- Never invent data to fill a chart. If there is no real number, use a diagram or a clearly labelled illustrative sketch.
+- Never invent data to fill a chart. If there are no measured numbers, a labelled mechanism diagram may help; otherwise keep the slide text-only.
 
 ### Text placement in charts
 
@@ -173,7 +183,7 @@ Every chart points the listener at one thing, with color and a callout. No "Look
   - Line charts: text in the empty area beside the point (usually after the last point of a short series), arrow to the point.
 - **How to place it exactly:** give the chart a fixed plot area (`c:manualLayout`, `layoutTarget inner`, edge mode) and set the value axis maximum yourself. Then bar positions follow from the category count, gap width and overlap, and the arrow can be computed instead of guessed. Do not rely on PowerPoint's automatic plot layout for anything a callout points at.
 - The arrow stops about 0.1 in short of the bar end or label. It never touches them.
-- The explanation panel uses the same words as the callout, so eye and ear meet.
+- The explanation names the same component or metric as the callout and explains its mechanism or comparison scope.
 - For diagrams, the focus is a box or arrow in the strong color, with a callout phrase next to it if needed. In a GIF, draw the callout on the final frame.
 
 ### Motion: GIFs for change
@@ -191,10 +201,10 @@ When the point of a slide is a change (bars moving earlier, a wait shrinking, a 
 
 For an engineering audience, every change slide is followed by one slide that shows how that part of the system works, so the change makes sense mechanically.
 
-- Layout: Visual + explanation. Diagram on the left, numbered steps on the right, the real code or config in the command chip.
-- Title: the mechanism as a statement ("A deferred task needs a second trip through the scheduler to finish"). Context line starts with "Background for R1." so the link to the change slide is explicit.
+- Layout: Technical text + visual. Numbered explanation sentences on the left, a supporting diagram on the right, and real code/config in the left-column command chip. Use text-only if a diagram would merely repeat the explanation.
+- Title: the mechanism as a technical statement, such as "Deferral releases worker slots but adds a resume path". The scope line identifies the relevant change or setting without a generic "Background for..." introduction.
 - Diagram: the components that take part, grouped in dashed zones by system (Kubernetes, Airflow, the database, the cloud service). Zone labels go top-right inside the zone, because step badges sit top-left of the boxes.
-- Numbered badges (small white circles) on the boxes in the order things happen. The explanation panel lists the same steps with the same numbers, one short sentence each.
+- Numbered badges on diagram boxes follow execution order. The left explanation uses matching numbered sentences, with enough detail to state what each actor does and what triggers the next step.
 - Color: components in slate, the hops that cost time in rose, what the change does in sage. Stage colors only when the box is a pipeline stage.
 - When the change is a before and after of the mechanism, show both as two lanes on the same slide (before on top, after below), each with its own small title.
 - Every value on the slide (poll interval, image, resource request, setting) comes from the code or the PR. Read the code before drawing.
@@ -231,7 +241,7 @@ One color language across the whole deck. A color means the same thing on every 
 
 ## Look: calm Excalidraw style
 
-Think whiteboard sketch that someone cleaned up and toned down: white space, soft pastel fills, thin outlines, hand-drawn titles, a calm size for everything.
+Use clean technical sketches with white space, soft pastel fills, thin outlines and standard typography. The diagrams retain the restrained Excalidraw-style composition; the text uses Aptos rather than a hand-drawn font.
 
 - Slide size: 16:9 widescreen.
 - Background: white `FFFFFF`. No gradients, no background images, no shadows, no decorative bars or stripes, no underline under titles.
@@ -259,12 +269,12 @@ Think whiteboard sketch that someone cleaned up and toned down: white space, sof
 
 ### Fonts
 
-- Titles and diagram labels: `Excalifont` (the font Excalidraw uses). Fallback when it is not installed: `Chalkboard SE`, which ships with macOS.
-- Body text, explanation, chart labels, sources, notes: `Helvetica Neue` (fallback `Arial`). Commands: `Menlo`.
-- Calm sizes: title 22 to 24pt, context line 12pt, explanation labels 9 to 10pt, explanation text 12 to 13pt, diagram labels 12 to 14pt, chart labels 10 to 11pt, commands 9 to 10pt, sources 9pt (links only), hero numbers 60 to 80pt. Keep one font scale constant in the generator so the whole deck can be resized in one place.
-- Hand-drawn fonts are not installed on most other machines. When delivering, remind him once that people without the font will see a substitute, and that he can turn on font embedding when saving in PowerPoint or share a PDF copy next to the .pptx.
+- Titles: `Aptos SemiBold`. Body, explanation, diagram labels, chart labels, sources and notes: `Aptos` regular. Fallbacks: `Arial Bold` for titles and `Arial` for other text. Commands stay in `Menlo`.
+- Regenerate GIFs with the same Aptos faces used in native slide objects. Do not leave old hand-drawn fonts inside animations after changing the deck typography. On macOS, Office bundles Aptos under its application resources; locate those files rather than silently substituting a different raster font.
+- Calm sizes: title 22 to 24pt, context line 12pt, explanation paragraphs 12 to 13pt (about 14pt in the wider text-only layout), diagram labels 12 to 14pt, chart labels 10 to 11pt, commands 9 to 10pt, sources 9pt (links only), hero numbers 60 to 80pt. Keep one font scale constant in the generator so the whole deck can be resized in one place.
+- Aptos ships with current Microsoft Office. For recipients using older software without Aptos, use the Arial fallback or enable font embedding where permitted. Mention font availability only when it affects the delivery.
 
-The render check in a Linux sandbox will not have these fonts, so leave about 15% slack in every text box and do not trust the preview for exact text fit.
+Leave about 15% slack in text boxes and recheck wrapping after any font change. A renderer without the actual font cannot verify exact text fit.
 
 ## Sources
 
@@ -295,13 +305,13 @@ Use a scripted generator that runs on macOS and writes native objects: `pptxgenj
 1. Render the deck to images (LibreOffice headless to PDF, then to images) and look at every slide. On his Mac, PowerPoint and Keynote AppleScript exports hang or fail silently because of sandbox dialogs, so do not rely on them. If LibreOffice is not installed, ask him to open the file himself or to approve installing it.
 2. Fix text overflow, overlaps, arrows crossing labels, uneven spacing, anything touching the slide edge or leaving the grid.
 3. Read only the titles in order. Do they tell the story?
-4. Every content slide has a context line, an explanation in the template blocks within about 40 words, and a command chip where a real command exists.
+4. Content slides use technical definitions, execution mechanics and causal explanations. Text is left-aligned in the left column; supporting visuals are on the right unless a full-width exception is justified. Context identifies scope, not a conversational lead-in. Commands are shown when they add implementation detail.
 5. Color check: every category has one hue across all slides, semantic colors keep their meaning, nothing saturated outside a single hero number.
 6. Chart check: no automatic chart titles, no label touching another label or a bar edge, no text box over a plot area, every chart has one focus with a callout arrow in free space, and no "look at" text.
 7. Each GIF has an editable native version (in the appendix, or for a takeaway the chart earlier in the deck) and its last frame matches the static numbers.
 8. Each change slide is followed by its technical background slide, with numbered badges matching the explanation steps.
 9. Takeaway check: 2 to 4 takeaways on 1 slide (2 at most) in an aligned grid, each with a GIF or a native chart of numbers already in the deck, then a review slide that works on its own as the last presented slide.
-10. Every content slide has a visual. Every external claim has a linked source line and an entry on the Sources slide; no slide has a source line without a URL.
+10. Every visual adds information beyond the prose; remove redundant charts and flow boxes. Text-only slides are valid. Every external claim has a linked source and an entry on the Sources slide; no slide has a source line without a URL.
 11. Search all text and notes for em dashes and the banned words. Remove them.
 12. Confirm nothing that should be editable is an image, apart from the GIFs.
 
