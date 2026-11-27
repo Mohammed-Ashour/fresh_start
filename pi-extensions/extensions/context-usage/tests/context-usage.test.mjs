@@ -94,7 +94,7 @@ test("extension: footer bar and /context view", async () => {
 		ui: { get theme() { throw new Error("no theme"); }, setStatus: (_k, v) => statuses.push(v), notify: (t) => notes.push(t) },
 	};
 	await handlers.session_start({}, ctx);
-	assert.match(statuses.at(-1), /^ctx [█▒░]{20} 75% 150K\/200K · compact in \d+%  ●system ●tools ●ext ●memory ●skills ●chat$/);
+	assert.match(statuses.at(-1), /^ctx [█▒░]{20} 75% 150K\/200K · compact in \d+%  ●system ●chat$/);
 	await commands.context.handler("", ctx);
 	const view = notes.at(-1);
 	assert.match(view, /Context Usage/);

@@ -3,11 +3,11 @@
  *
  * Footer: a bar colored by what fills the context window, for example
  *
- *   ctx ███████░░░░░░░░░░░░▒ 31% 62K/200K  ●system ●tools ●memory ●skills ●chat ●output
+ *   ctx ███████░░░░░░░░░░░░▒ 31% 62K/200K  ●system ●chat ●output
  *
- * Each color is a category (system prompt, tools, memory files, skills, chat
- * messages, tool output); the legend names the ones present. Past 60% it also
- * shows the room left before Pi's automatic compaction.
+ * system = system prompt, tools, memory files, and skills; chat = messages;
+ * output = tool results. Past 60% it also shows the room left before Pi's
+ * automatic compaction.
  *
  * /context: a detailed view like Claude Code's, with a 10×10 grid, per-category
  * token counts, memory files, skills, the largest tools, and message counts.
@@ -53,19 +53,17 @@ const COLORS: Record<Category, ThemeColor> = {
 	buffer: "dim",
 };
 
-/** Short legend names for the footer. */
-const SHORT_LABELS: Record<Category, string> = {
-	system: "system",
-	tools: "tools",
-	mcp: "mcp",
-	extensionTools: "ext",
-	memory: "memory",
-	skills: "skills",
-	messages: "chat",
-	toolResults: "output",
-	free: "free",
-	buffer: "buffer",
+/**
+ * The footer groups categories into three: everything loaded before the
+ * conversation (system prompt, tools, memory files, skills), the chat itself,
+ * and tool output. /context shows the full split.
+ */
+type Group = "system" | "chat" | "output";
+const GROUP_OF: Partial<Record<Category, Group>> = {
+	system: "system", tools: "system", mcp: "system", extensionTools: "system", memory: "system", skills: "system",
+	messages: "chat", toolResults: "output",
 };
+const GROUP_COLORS: Record<Group, ThemeColor> = { system: "muted", chat: "accent", output: "syntaxString" };
 
 /** Footer glyphs: used space is solid, the compaction buffer is shaded, free space is light. */
 const FOOTER_GLYPH: Partial<Record<Category, string>> = { free: "░", buffer: "▒" };
@@ -122,8 +120,27 @@ export default function (pi: ExtensionAPI) {
 
 	function footerText(b: Breakdown, theme: Theme | undefined): string {
 		if (b.contextWindow <= 0) return "ctx: N/A";
-		const paint = (c: Category, text: string) => (theme ? theme.fg(COLORS[c], text) : text);
-		const bar = allocateCells(b, FOOTER_CELLS).map((c) => paint(c, FOOTER_GLYPH[c] ?? "█")).join("");
+		const fg = (color: ThemeColor, text: string) => (theme ? theme.fg(color, text) : text);
+		// Merge categories into the three footer groups, keeping free space and the buffer.
+		const totals = new Map<Group, number>();
+		for (const s of b.segments) {
+			const group = GROUP_OF[s.category];
+			if (group) totals.set(group, (totals.get(group) ?? 0) + s.tokens);
+		}
+		const groupOrder: Group[] = ["system", "chat", "output"];
+		const proxy: Record<Group, Category> = { system: "system", chat: "messages", output: "toolResults" };
+		const merged: Breakdown = {
+			...b,
+			segments: [
+				...groupOrder.filter((g) => (totals.get(g) ?? 0) > 0).map((g) => ({ category: proxy[g], tokens: totals.get(g)! })),
+				...b.segments.filter((s) => s.category === "free" || s.category === "buffer"),
+			],
+		};
+		const colorOf = (c: Category): ThemeColor => {
+			const group = GROUP_OF[c];
+			return group ? GROUP_COLORS[group] : "dim";
+		};
+		const bar = allocateCells(merged, FOOTER_CELLS).map((c) => fg(colorOf(c), FOOTER_GLYPH[c] ?? "█")).join("");
 		const percent = (b.used / b.contextWindow) * 100;
 		const tone: ThemeColor = percent >= 80 ? "error" : percent >= 50 ? "warning" : "text";
 		let label = `${b.estimated ? "~" : ""}${Math.round(percent)}% ${formatTokens(b.used)}/${formatTokens(b.contextWindow)}`;
@@ -131,12 +148,11 @@ export default function (pi: ExtensionAPI) {
 			const left = Math.max(0, Math.round(((b.contextWindow - reserveTokens - b.used) / b.contextWindow) * 100));
 			label += left > 0 ? ` · compact in ${left}%` : " · compacting next";
 		}
-		// Minimal legend: a colored dot and a short name for each part present in the bar.
-		const legend = b.segments
-			.filter((s) => s.category !== "free" && s.category !== "buffer" && s.tokens > 0)
-			.map((s) => `${paint(s.category, "●")}${theme ? theme.fg("dim", SHORT_LABELS[s.category]) : SHORT_LABELS[s.category]}`)
+		const legend = groupOrder
+			.filter((g) => (totals.get(g) ?? 0) > 0)
+			.map((g) => `${fg(GROUP_COLORS[g], "●")}${fg("dim", g)}`)
 			.join(" ");
-		return `${theme ? theme.fg("dim", "ctx") : "ctx"} ${bar} ${theme ? theme.fg(tone, label) : label}  ${legend}`;
+		return `${fg("dim", "ctx")} ${bar} ${fg(tone, label)}  ${legend}`;
 	}
 
 	function update(ctx: ExtensionContext) {

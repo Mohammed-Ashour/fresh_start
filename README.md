@@ -136,7 +136,7 @@ Or install through the main script:
 - custom answers and skip support
 
 **Context Usage**
-- footer bar colored by what fills the context (system prompt, tools, memory files, skills, messages, tool results): `ctx ███████████░░░░░░░░▒ 33% 91K/272K  ●system ●tools ●memory ●skills ●chat ●output`, with a colored dot per part
+- footer bar colored by what fills the context (system prompt, tools, memory files, skills, messages, tool results): `ctx ███████████░░░░░░░░▒ 33% 91K/272K  ●system ●chat ●output` (system = prompt, tools, memory files, skills; chat = messages; output = tool results)
 - yellow past 50%, red past 80%; past 60% it shows the room left before auto-compaction (`compact in 28%`)
 - `/context`: Claude Code-style breakdown with a 10×10 grid, tokens per category, memory files, skills, largest tools, and message counts
 
