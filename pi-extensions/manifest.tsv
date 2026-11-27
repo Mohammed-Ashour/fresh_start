@@ -1,6 +1,6 @@
 name	description
 ask-questions.ts	Multi-question picker tool
-context-usage.ts	Context bar in the footer (fill, tokens, room before auto-compact)
+context-usage	Context bar in the footer and a detailed /context view
 diff-review	/diff-review: review a git diff in the TUI
 diff-review-web	/diff-review-web: review a git diff in the browser
 exit-command.ts	/exit as an alias for /quit

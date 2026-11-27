@@ -301,6 +301,19 @@ done
 
 for name in "${TODO[@]}"; do
     [[ "$name" == permission-gate ]] && migrate_permission_gate
+    # An extension that became a folder (context-usage.ts -> context-usage/) must not load twice.
+    if [[ -d "$SOURCE/$name" && -f "$TARGET/$name.ts" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            row "${GREEN}↻${NC}" "$name.ts" "$GREEN" "would move to backups" "replaced by $name/"
+        else
+            mkdir -p "$PI_DIR/backups"
+            mv "$TARGET/$name.ts" "$PI_DIR/backups/$name.ts.$(date +%Y%m%d%H%M%S)"
+            if [[ -f "$STATE_FILE" ]]; then
+                awk -F '\t' -v old="$name.ts" '$1 != old' "$STATE_FILE" > "$STATE_FILE.$$.tmp" && mv "$STATE_FILE.$$.tmp" "$STATE_FILE"
+            fi
+            row "${GREEN}↻${NC}" "$name.ts" "$GREEN" "moved to backups" "replaced by $name/"
+        fi
+    fi
 done
 
 # Prompt templates (/commit, /pr) install with --all or from the interactive picker.
