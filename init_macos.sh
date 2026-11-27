@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --help               Show this help message"
             echo ""
             echo "Categories:"
-            echo "  core           - Homebrew, Zsh, Oh My Zsh, Git"
+            echo "  core           - Homebrew, Zsh, Oh My Zsh, Powerlevel10k, Git"
             echo "  dev-tools      - VS Code, lazygit, fzf, tmux"
             echo "  zed            - Zed editor + settings"
             echo "  productivity   - Ghostty, Rectangle, Obsidian, Zen, Bitwarden"
@@ -322,6 +322,66 @@ install_cask_if_missing() {
     mark_installed "$label"
 }
 
+setup_powerlevel10k() {
+    local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+    local p10k_dir="$zsh_custom/themes/powerlevel10k"
+    local p10k_config_src="$SCRIPT_DIR/configs/zsh/p10k.zsh"
+    local p10k_config_target="$HOME/.p10k.zsh"
+    local zshrc="$HOME/.zshrc"
+
+    if [[ -d "$p10k_dir" ]]; then
+        mark_already "Powerlevel10k"
+    elif confirm_action "Install Powerlevel10k?" "Y"; then
+        echo "Installing Powerlevel10k..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "Would run: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git $p10k_dir"
+        else
+            mkdir -p "$(dirname "$p10k_dir")"
+            git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$p10k_dir"
+        fi
+        mark_installed "Powerlevel10k"
+    else
+        echo "Skipping Powerlevel10k"
+        mark_skipped "Powerlevel10k"
+        return 0
+    fi
+
+    if [[ -f "$p10k_config_target" ]]; then
+        mark_already "Powerlevel10k config"
+    elif confirm_action "Install the minimal Powerlevel10k config?" "Y"; then
+        echo "Installing Powerlevel10k config..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "Would copy $p10k_config_src to $p10k_config_target"
+        else
+            cp "$p10k_config_src" "$p10k_config_target"
+        fi
+        mark_installed "Powerlevel10k config"
+    else
+        echo "Skipping Powerlevel10k config"
+        mark_skipped "Powerlevel10k config"
+    fi
+
+    if ! confirm_action "Use Powerlevel10k as the Zsh theme?" "Y"; then
+        echo "Skipping Powerlevel10k theme selection"
+        mark_skipped "Powerlevel10k theme selection"
+        return 0
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "Would set ZSH_THEME=powerlevel10k/powerlevel10k in $zshrc"
+        echo "Would append the Powerlevel10k config source to $zshrc if missing"
+    else
+        touch "$zshrc"
+        if grep -Eq '^[[:space:]]*ZSH_THEME=' "$zshrc"; then
+            sed -i '' 's|^[[:space:]]*ZSH_THEME=.*$|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$zshrc"
+        else
+            printf '%s\n' 'ZSH_THEME="powerlevel10k/powerlevel10k"' >> "$zshrc"
+        fi
+    fi
+    append_line_if_missing '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh' "$zshrc"
+    mark_installed "Powerlevel10k theme selection"
+}
+
 run_category_selection() {
     case "$1" in
         1|core)
@@ -489,6 +549,9 @@ setup_core() {
     else
         mark_already "Git"
     fi
+
+    # Install and configure the minimal Powerlevel10k theme.
+    setup_powerlevel10k
 }
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -776,7 +839,7 @@ main() {
         PICKER_VALUES=(core dev-tools zed productivity kubernetes cli-tools pi-extensions pi-skills)
         PICKER_LABELS=("Core" "Development tools" "Zed" "Productivity" "Kubernetes" "CLI tools" "Pi extensions" "Pi skills")
         PICKER_DETAILS=(
-            "Homebrew, Zsh, Oh My Zsh, Git"
+            "Homebrew, Zsh, Oh My Zsh, Powerlevel10k, Git"
             "VS Code, lazygit, fzf, tmux"
             "Editor and bundled settings"
             "Ghostty, Rectangle, Obsidian, Zen, Bitwarden"

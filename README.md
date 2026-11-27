@@ -25,7 +25,7 @@ Modular macOS development environment setup with interactive multi-select picker
 
 | Category | Includes |
 |----------|----------|
-| `core` | Homebrew, Zsh, Oh My Zsh, Git |
+| `core` | Homebrew, Zsh, Oh My Zsh, Powerlevel10k, Git |
 | `dev-tools` | VS Code, lazygit, fzf, tmux |
 | `zed` | Zed editor, bundled settings |
 | `productivity` | Ghostty, Ghostty keybindings, Rectangle, Obsidian, Zen Browser, Bitwarden |
@@ -52,6 +52,12 @@ Each skill gets one status line: installed, updated, up to date, or kept because
 ```bash
 ./init_macos.sh --category pi-skills
 ```
+
+### Zsh theme
+
+The `core` category installs Powerlevel10k and a portable, minimal prompt configuration at `~/.p10k.zsh`. It keeps the directory, Git state, active Python/Node/Kubernetes context, command duration, and time visible using foreground colors without background blocks.
+
+Existing `~/.p10k.zsh` files are preserved. The installer updates the `ZSH_THEME` line in `~/.zshrc` only after confirmation and adds the config source line if it is missing.
 
 ### Included skills
 
