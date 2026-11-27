@@ -19,7 +19,8 @@ PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 TARGET="$PI_DIR/extensions"
 SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$SETUP_DIR/extensions"
-PACKAGE="npm:pi-web-access"
+# Pinned: Pi packages run with your full permissions, so updates should be deliberate.
+PACKAGE="npm:pi-web-access@0.48.0"
 STATE_FILE="$TARGET/.fresh-start-state"
 source "$SETUP_DIR/../lib/installer-ui.sh"
 
@@ -302,6 +303,25 @@ for name in "${TODO[@]}"; do
     [[ "$name" == permission-gate ]] && migrate_permission_gate
 done
 
+# Prompt templates (/commit, /pr) install with --all or from the interactive picker.
+if [[ "$ALL" == true || "$PICKED_INTERACTIVELY" == true ]]; then
+    PROMPTS_TARGET="$PI_DIR/prompts"
+    [[ "$DRY_RUN" == false ]] && mkdir -p "$PROMPTS_TARGET"
+    for prompt in "$SETUP_DIR"/prompts/*.md; do
+        [[ -e "$prompt" ]] || continue
+        file="$(basename "$prompt")"
+        target="$PROMPTS_TARGET/$file"
+        if [[ -e "$target" ]] && cmp -s "$prompt" "$target"; then
+            row "${GREEN}✓${NC}" "/${file%.md}" "$DIM" "up to date" "prompt template"
+        elif [[ -e "$target" && "$FORCE" == false ]]; then
+            row "${YELLOW}!${NC}" "/${file%.md}" "$YELLOW" "local changes, kept" "use --force to replace"
+        else
+            [[ "$DRY_RUN" == false ]] && cp "$prompt" "$target"
+            row "${GREEN}+${NC}" "/${file%.md}" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would install" || echo installed)" "prompt template"
+        fi
+    done
+fi
+
 echo
 if [[ "$INSTALL_PACKAGE" == true ]]; then
     echo "${BOLD}Pi package${NC}"
@@ -309,10 +329,11 @@ if [[ "$INSTALL_PACKAGE" == true ]]; then
         row "${YELLOW}!${NC}" "$PACKAGE" "$YELLOW" "skipped: pi not on PATH" "web search for pi and mini-agents"
     elif [[ "$DRY_RUN" == true ]]; then
         row "${GREEN}+${NC}" "$PACKAGE" "$GREEN" "would run pi install" "web search for pi and mini-agents"
-    elif pi install "$PACKAGE" >/dev/null 2>&1; then
+    elif install_log="$(pi install "$PACKAGE" 2>&1)"; then
         row "${GREEN}✓${NC}" "$PACKAGE" "$GREEN" "installed" "web search for pi and mini-agents"
     else
         row "${RED}✗${NC}" "$PACKAGE" "$RED" "pi install failed" "retry: pi install $PACKAGE"
+        printf '%s\n' "$install_log" | tail -n 20 | sed 's/^/      /' >&2
     fi
     echo
 fi

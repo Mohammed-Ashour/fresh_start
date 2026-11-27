@@ -109,7 +109,15 @@ Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-acces
 ./pi-extensions/setup.sh --all --force     # overwrite every installed extension copy
 ```
 
-Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
+Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. `--all` and the interactive picker also install the `/commit` and `/pr` prompt templates from `pi-extensions/prompts/`. Package versions are pinned on purpose; bump them deliberately.
+
+```bash
+./pi-extensions/test.sh                    # run every extension's tests (+ type check when tsc is available)
+./pi-extensions/prune-sessions.sh          # show sessions/exports older than 90 days
+./pi-extensions/prune-sessions.sh --apply  # delete them (sessions can contain secrets)
+```
+
+Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-extensions

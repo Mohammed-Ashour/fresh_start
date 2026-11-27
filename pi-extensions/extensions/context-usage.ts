@@ -7,25 +7,22 @@
  * Updates after each message, turn, model change, and session start.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const STATUS_ID = "ctx";
 
 export default function (pi: ExtensionAPI) {
-	async function updateStatusBar(ctx: { getContextUsage: () => any; model: any; ui: { setStatus: (id: string, text: string | undefined) => void } }) {
+	function updateStatusBar(ctx: ExtensionContext) {
 		const usage = ctx.getContextUsage();
-		if (!usage || usage.tokens === undefined) {
+		// tokens is null right after compaction, until the next model response.
+		if (!usage || usage.tokens === null || usage.percent === null) {
 			ctx.ui.setStatus(STATUS_ID, "ctx: N/A");
 			return;
 		}
 
-		const used = usage.tokens;
-		const max = ctx.model?.contextWindow ?? 200_000;
-		const percent = Math.round((used / max) * 100);
-		const indicator = percent > 50 ? "⚠" : "";
-		const formatted = `${indicator} ctx: ${percent}% (${fmt(used)}/${fmt(max)})`;
-
-		ctx.ui.setStatus(STATUS_ID, formatted);
+		const percent = Math.round(usage.percent);
+		const indicator = percent > 50 ? "⚠ " : "";
+		ctx.ui.setStatus(STATUS_ID, `${indicator}ctx: ${percent}% (${fmt(usage.tokens)}/${fmt(usage.contextWindow)})`);
 	}
 
 	function fmt(n: number): string {
@@ -35,18 +32,18 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
-		await updateStatusBar(ctx);
+		updateStatusBar(ctx);
 	});
 
 	pi.on("message_end", async (_event, ctx) => {
-		await updateStatusBar(ctx);
+		updateStatusBar(ctx);
 	});
 
 	pi.on("turn_end", async (_event, ctx) => {
-		await updateStatusBar(ctx);
+		updateStatusBar(ctx);
 	});
 
 	pi.on("model_select", async (_event, ctx) => {
-		await updateStatusBar(ctx);
+		updateStatusBar(ctx);
 	});
 }
