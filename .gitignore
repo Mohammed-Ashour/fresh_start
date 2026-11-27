@@ -1,1 +1,3 @@
 .DS_Store
+# Session exports contain transcripts and may contain secrets.
+pi-share-*.html

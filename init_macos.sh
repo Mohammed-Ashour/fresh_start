@@ -84,7 +84,7 @@ while [[ $# -gt 0 ]]; do
             echo "  kubernetes     - Docker, kubectl, Helm, Minikube, K9s"
             echo "  cli-tools      - bat, eza, ripgrep, zellij, lazydocker"
             echo "  pi-extensions  - Pi extensions + pi web access"
-            echo "  pi-skills      - Pi agent skills (review, ponytail, agdr, ...)"
+            echo "  pi-skills      - Pi agent skills (skipper-review, ponytail, agdr, ...)"
             exit 0
             ;;
         *)

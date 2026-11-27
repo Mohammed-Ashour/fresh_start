@@ -7,6 +7,11 @@ import { rotateStream } from "./rotation";
 import { availability, fetchUsageSnapshot, withUsage, WHAM_MIN_INTERVAL_MS } from "./usage";
 import { accountName, choiceLabel, completions, findAccount, footerLine, help, usageReport } from "./ui";
 
+/** Pi's Codex catalog changes between releases, so prefer a non-spark chat model over a fixed id. */
+function defaultCodexModel<T extends { id: string }>(models: readonly T[]): T | undefined {
+    return models.find(m => !m.id.includes("spark")) ?? models[0];
+}
+
 /** One native Codex provider and OAuth flow. Settings and a valid core credential stay intact. */
 export default async function (pi: ExtensionAPI) {
     const found = builtinProviders().find(provider => provider.id === CORE);
@@ -132,7 +137,7 @@ export default async function (pi: ExtensionAPI) {
             const configured = pi.getSettings().defaultModel;
             const models = ctx.modelRegistry.getModelsOfType("chat", CORE);
             const model = models.find(m => m.id === preferred) ?? models.find(m => m.id === configured)
-                ?? models.find(m => m.id === "gpt-5.5") ?? models.find(m => !m.id.includes("spark")) ?? models[0];
+                ?? defaultCodexModel(models);
             if (!model) throw new Error("No Codex models available; sign in with /codex or /login");
             return { model, thinkingLevel: request.thinkingLevel };
         },
@@ -218,7 +223,7 @@ export default async function (pi: ExtensionAPI) {
             await ctx.modelRegistry.refresh({ allowNetwork: false });
             signal.throwIfAborted();
             if (!ctx.model || ctx.model.provider === CORE || ctx.model.provider === "codex-multi" || ctx.model.provider.startsWith(PREFIX)) {
-                const model = ctx.modelRegistry.find(CORE, ctx.model?.id ?? "") ?? ctx.modelRegistry.find(CORE, "gpt-5.5");
+                const model = ctx.modelRegistry.find(CORE, ctx.model?.id ?? "") ?? defaultCodexModel(ctx.modelRegistry.getModelsOfType("chat", CORE));
                 if (model) await pi.setModel(model);
             }
             signal.throwIfAborted();
@@ -272,8 +277,7 @@ export default async function (pi: ExtensionAPI) {
                 ctx.ui.notify(`${name} is waiting for a quota reset. Use /codex usage to refresh, or choose another account.`, "warning"); return;
             }
             if (ctx.model?.provider !== CORE) {
-                const model = ctx.modelRegistry.find(CORE, ctx.model?.id ?? "") ?? ctx.modelRegistry.find(CORE, "gpt-5.5")
-                    ?? ctx.modelRegistry.getModelsOfType("chat", CORE)[0];
+                const model = ctx.modelRegistry.find(CORE, ctx.model?.id ?? "") ?? defaultCodexModel(ctx.modelRegistry.getModelsOfType("chat", CORE));
                 if (!model || !await pi.setModel(model)) throw new Error("No usable Codex model. Sign in with /codex add.");
             }
             if (lifecycle.signal.aborted || lifecycle !== stopped) return;

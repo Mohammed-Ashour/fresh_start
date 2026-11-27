@@ -140,7 +140,7 @@ function commandHarness(service, options = {}) {
           cwd: context.cwd, agentDir, settingsManager: core.SettingsManager.inMemory({}),
           noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true,
           systemPromptOverride: () => "Parent effective instructions: preserve unrelated changes.",
-          additionalExtensionPaths: [new URL("../../permission-gate.ts", import.meta.url).pathname],
+          additionalExtensionPaths: [new URL("../../permission-gate/index.ts", import.meta.url).pathname],
           extensionFactories: [(pi) => {
             pi.on("tool_call", (event) => {
               parentCalls.push(event.toolName);
@@ -554,7 +554,7 @@ test("live parent permission changes apply after a child question", async () => 
     await command(h, "reply 1 proceed");
     await waitFor(() => h.reports.length === 1);
     assert.equal(existsSync(join(h.context.cwd, "implemented.txt")), false);
-    assert.match(JSON.stringify(service.requests.at(-1).messages), /Plan mode: only .md files allowed/);
+    assert.match(JSON.stringify(service.requests.at(-1).messages), /Plan mode: only \.md files can be written/);
   } finally { await h.close(); }
 });
 

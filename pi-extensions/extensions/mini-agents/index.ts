@@ -10,8 +10,10 @@ import {
   buildSessionContext, createAgentSession, DefaultResourceLoader, defineTool, getAgentDir,
   ModelRuntime, SessionManager, SettingsManager,
   type AgentSession, type ExtensionAPI, type ExtensionContext, type ExtensionCommandContext, type ExtensionToolContext,
-  type SessionContext, type Settings, type Skill, type Theme,
+  type SessionContext, type Skill, type Theme,
 } from "@earendil-works/pi-coding-agent";
+
+type Settings = ReturnType<ExtensionAPI["getSettings"]>;
 import {
   fuzzyFilter, Input, Key, matchesKey, SelectList, truncateToWidth, wrapTextWithAnsi,
   type AutocompleteItem, type Component, type Focusable, type SelectItem, type TUI,
@@ -379,7 +381,7 @@ export async function runJob(
       ({ session } = await createAgentSession({
         cwd, model, modelRuntime: runtime, resourceLoader: loader, settingsManager: settings,
         sessionManager: SessionManager.inMemory(cwd), thinkingLevel: resources.thinkingLevel || "medium",
-        noTools: writable,
+        noTools: writable ? "builtin" : undefined,
         tools: writable ? [...parentTools.map((tool) => tool.name), ...helpers.map((tool) => tool.name), "ask_user",
           ...(options.web ? ["web_enable", "web_search", "source_check", "fetch_content", "get_search_content"] : [])] :
           ["read", "grep", "find", "ls", "ask_user", "git_changes", "github_data",

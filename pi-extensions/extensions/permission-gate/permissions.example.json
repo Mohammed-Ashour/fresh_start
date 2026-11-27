@@ -1,0 +1,12 @@
+{
+  "mode": "safeMode",
+  "sandbox": false,
+  "extraSecretPaths": [],
+  "extraWriteProtectedPaths": [],
+  "extraReadOnlyCommands": [],
+  "askPatterns": [
+    { "pattern": "\\bprod(uction)?\\b.*\\b(deploy|migrate)\\b", "description": "production deploy or migration" }
+  ],
+  "blockPatterns": [],
+  "disabledRules": []
+}

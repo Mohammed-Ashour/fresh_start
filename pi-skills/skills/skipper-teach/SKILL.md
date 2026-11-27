@@ -213,7 +213,7 @@ Never claim validation passed unless the command was run and its result was obse
 - Include visual, practice, glossary, learning-record, or commit details only when they were created, changed, or materially affect the result.
 - Report validation with observed results, or `not run` with the reason.
 - Do not claim that learning occurred without evidence. Omit empty categories, generic advice, and unrelated follow-on lessons.
-- Before writing or returning the lesson, use the `humanizer` skill in embedded mode on its prose. Preserve verified facts, URLs, code blocks, commands, HTML structure, and accessibility requirements exactly; humanize only explanatory text.
+- Before writing or returning the lesson, use the `unslop` skill on its prose. Preserve verified facts, URLs, code blocks, commands, HTML structure, and accessibility requirements exactly; humanize only explanatory text.
 
 ## Completion criteria
 

@@ -19,7 +19,8 @@ PI_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 TARGET="$PI_DIR/extensions"
 SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$SETUP_DIR/extensions"
-PACKAGE="npm:pi-web-access"
+# Pinned: Pi packages run with your full permissions, so updates should be deliberate.
+PACKAGE="npm:pi-web-access@0.48.0"
 STATE_FILE="$TARGET/.fresh-start-state"
 source "$SETUP_DIR/../lib/installer-ui.sh"
 
@@ -120,6 +121,36 @@ state_of() {
     if [[ -n "$previous_hash" && "$target_hash" == "$previous_hash" ]]; then echo update
     else echo changed
     fi
+}
+
+# permission-gate used to be permission-gate.ts plus permissions.json in the
+# extensions folder. Keep the user's mode in the new config location and move the
+# old files out of the folder Pi loads, so two gates never run at once.
+migrate_permission_gate() {
+    local legacy="$TARGET/permission-gate.ts" legacy_config="$TARGET/permissions.json"
+    local backup="$PI_DIR/backups/permission-gate-$(date +%Y%m%d%H%M%S)" temporary
+    [[ -e "$legacy" || -e "$legacy_config" ]] || return 0
+    if [[ "$DRY_RUN" == true ]]; then
+        row "${GREEN}↻${NC}" "legacy gate" "$GREEN" "would move to backups" "old permission-gate.ts / permissions.json"
+        return 0
+    fi
+    mkdir -p "$backup"
+    if [[ -f "$legacy_config" && ! -e "$PI_DIR/permissions.json" ]] && command -v node >/dev/null 2>&1; then
+        node -e '
+            const fs = require("fs");
+            const old = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const mode = old.mode === "fullAuto" ? "safeMode" : old.mode;
+            fs.writeFileSync(process.argv[2], JSON.stringify(mode ? { mode } : {}, null, 2) + "\n");
+        ' "$legacy_config" "$PI_DIR/permissions.json" || true
+    fi
+    [[ -e "$legacy" ]] && mv "$legacy" "$backup/"
+    [[ -e "$legacy_config" ]] && mv "$legacy_config" "$backup/"
+    if [[ -f "$STATE_FILE" ]]; then
+        temporary="$STATE_FILE.$$.tmp"
+        awk -F '\t' '$1 != "permission-gate.ts" && $1 != "permissions.json"' "$STATE_FILE" > "$temporary"
+        mv "$temporary" "$STATE_FILE"
+    fi
+    row "${GREEN}↻${NC}" "legacy gate" "$GREEN" "moved to backups" "${backup/#$HOME/~}"
 }
 
 row() {
@@ -268,6 +299,42 @@ for name in "${TODO[@]}"; do
     fi
 done
 
+for name in "${TODO[@]}"; do
+    [[ "$name" == permission-gate ]] && migrate_permission_gate
+    # An extension that became a folder (context-usage.ts -> context-usage/) must not load twice.
+    if [[ -d "$SOURCE/$name" && -f "$TARGET/$name.ts" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            row "${GREEN}↻${NC}" "$name.ts" "$GREEN" "would move to backups" "replaced by $name/"
+        else
+            mkdir -p "$PI_DIR/backups"
+            mv "$TARGET/$name.ts" "$PI_DIR/backups/$name.ts.$(date +%Y%m%d%H%M%S)"
+            if [[ -f "$STATE_FILE" ]]; then
+                awk -F '\t' -v old="$name.ts" '$1 != old' "$STATE_FILE" > "$STATE_FILE.$$.tmp" && mv "$STATE_FILE.$$.tmp" "$STATE_FILE"
+            fi
+            row "${GREEN}↻${NC}" "$name.ts" "$GREEN" "moved to backups" "replaced by $name/"
+        fi
+    fi
+done
+
+# Prompt templates (/commit, /pr) install with --all or from the interactive picker.
+if [[ "$ALL" == true || "$PICKED_INTERACTIVELY" == true ]]; then
+    PROMPTS_TARGET="$PI_DIR/prompts"
+    [[ "$DRY_RUN" == false ]] && mkdir -p "$PROMPTS_TARGET"
+    for prompt in "$SETUP_DIR"/prompts/*.md; do
+        [[ -e "$prompt" ]] || continue
+        file="$(basename "$prompt")"
+        target="$PROMPTS_TARGET/$file"
+        if [[ -e "$target" ]] && cmp -s "$prompt" "$target"; then
+            row "${GREEN}✓${NC}" "/${file%.md}" "$DIM" "up to date" "prompt template"
+        elif [[ -e "$target" && "$FORCE" == false ]]; then
+            row "${YELLOW}!${NC}" "/${file%.md}" "$YELLOW" "local changes, kept" "use --force to replace"
+        else
+            [[ "$DRY_RUN" == false ]] && cp "$prompt" "$target"
+            row "${GREEN}+${NC}" "/${file%.md}" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would install" || echo installed)" "prompt template"
+        fi
+    done
+fi
+
 echo
 if [[ "$INSTALL_PACKAGE" == true ]]; then
     echo "${BOLD}Pi package${NC}"
@@ -275,10 +342,11 @@ if [[ "$INSTALL_PACKAGE" == true ]]; then
         row "${YELLOW}!${NC}" "$PACKAGE" "$YELLOW" "skipped: pi not on PATH" "web search for pi and mini-agents"
     elif [[ "$DRY_RUN" == true ]]; then
         row "${GREEN}+${NC}" "$PACKAGE" "$GREEN" "would run pi install" "web search for pi and mini-agents"
-    elif pi install "$PACKAGE" >/dev/null 2>&1; then
+    elif install_log="$(pi install "$PACKAGE" 2>&1)"; then
         row "${GREEN}✓${NC}" "$PACKAGE" "$GREEN" "installed" "web search for pi and mini-agents"
     else
         row "${RED}✗${NC}" "$PACKAGE" "$RED" "pi install failed" "retry: pi install $PACKAGE"
+        printf '%s\n' "$install_log" | tail -n 20 | sed 's/^/      /' >&2
     fi
     echo
 fi

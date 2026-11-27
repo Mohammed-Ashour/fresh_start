@@ -32,7 +32,7 @@ Modular macOS development environment setup with interactive multi-select picker
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
 | `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, codex-accounts, diff-review, diff-review-web, mini-agents, pi-web-access |
-| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, mo-presentation, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
+| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, mo-presentation, ponytail, ponytail-audit, ponytail-review, pr-review-guide, pr-splitter, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
 
 ## Pi Skills
 
@@ -71,16 +71,12 @@ Existing `~/.p10k.zsh` files are preserved. The installer updates the `ZSH_THEME
 | `frontend-skill` | Visually strong landing pages, apps, and UI |
 | `grill-me` | Stress-test a plan or design via relentless questioning |
 | `handoff` | Compact the conversation into a handoff document |
-| `humanizer` | Remove signs of AI-generated writing |
 | `mo-presentation` | Story-driven, sourced, editable PowerPoint decks: golden-ratio layouts, native charts with callouts, GIFs for change |
 | `ponytail` | Force the laziest solution that actually works |
 | `ponytail-audit` | Whole-repo audit for over-engineering |
 | `ponytail-review` | Code review focused on over-engineering |
-| `pr-rev-guide` | Generate and post a structured PR review guide |
 | `pr-review-guide` | Reviewer guide for long or hard-to-review PRs |
-| `pr-reviewer` | In-depth PR and branch review with severity-ranked findings |
 | `pr-splitter` | Split oversized PRs into smaller scoped PRs |
-| `review` | Correctness-focused code review |
 | `review-story` | Concise narrative walkthrough of PR changes |
 | `science-pr-review` | Stage 0-5 science-model lifecycle gate; used by skipper-review on science PRs |
 | `security-best-practices` | Language/framework security best-practice reviews |
@@ -109,7 +105,15 @@ Extensions are copied into `~/.pi/agent/extensions/`, then the `npm:pi-web-acces
 ./pi-extensions/setup.sh --all --force     # overwrite every installed extension copy
 ```
 
-Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. Or install through the main script:
+Same status lines and safe update tracking as the skills script. It also warns when `pi` or an authenticated `gh` (for mini-agents PR reviews) is missing. `--all` and the interactive picker also install the `/commit` and `/pr` prompt templates from `pi-extensions/prompts/`. Package versions are pinned on purpose; bump them deliberately.
+
+```bash
+./pi-extensions/test.sh                    # run every extension's tests (+ type check when tsc is available)
+./pi-extensions/prune-sessions.sh          # show sessions/exports older than 90 days
+./pi-extensions/prune-sessions.sh --apply  # delete them (sessions can contain secrets)
+```
+
+Or install through the main script:
 
 ```bash
 ./init_macos.sh --category pi-extensions
@@ -118,14 +122,13 @@ Same status lines and safe update tracking as the skills script. It also warns w
 ### Included extensions and packages
 
 **Permission Gate**
-- 6 modes: `default`, `acceptEdits`, `fullAuto`, `safeMode`, `bypassPermissions`, `plan`
-- catastrophic and dangerous command blocking
-- protected path blocking
-- exempt command support
-- session-scoped approvals
-- `/permissions` to switch modes
-- `Ctrl+Shift+P` to cycle modes
-- default shipped config: `safeMode`
+- modes: `plan`, `default`, `acceptEdits`, `safeMode` (default), `bypassPermissions`
+- safe mode stays quiet for normal work and asks only for risky actions (force push, discarding uncommitted changes, deleting outside the project, publishing, destroying infrastructure)
+- blocks catastrophic commands and secret paths (`~/.ssh`, `~/.aws`, auth files) in every mode, including through `read`/`grep`
+- parses shell commands, so `echo ok; rm -rf ~`, `bash -c`, `$(...)` and `xargs` cannot hide anything
+- optional macOS sandbox for bash (`"sandbox": true`)
+- `/permissions`, `/permissions-explain <command>`, `/sandbox`; `Ctrl+Shift+P` cycles modes
+- config: `~/.pi/agent/permissions.json`; see [its README](pi-extensions/extensions/permission-gate/README.md)
 
 **Ask Questions**
 - multi-question UI
@@ -133,8 +136,9 @@ Same status lines and safe update tracking as the skills script. It also warns w
 - custom answers and skip support
 
 **Context Usage**
-- footer status bar showing current context usage
-- warning indicator at 50%+
+- footer bar colored by what fills the context (system prompt, tools, memory files, skills, messages, tool results): `ctx ███████████░░░░░░░░▒ 33% 91K/272K  ●system ●chat ●output` (system = prompt, tools, memory files, skills; chat = messages; output = tool results)
+- yellow past 50%, red past 80%; past 60% it shows the room left before auto-compaction (`compact in 28%`)
+- `/context`: Claude Code-style breakdown with a 10×10 grid, tokens per category, memory files, skills, largest tools, and message counts
 
 **Codex Accounts**
 - `/codex` manages several ChatGPT accounts using the same native sign-in as `/login`

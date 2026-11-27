@@ -23,6 +23,9 @@ const sse = () => {
     return new Response(events.map(e => `data: ${JSON.stringify(e)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
 };
 
+// Pi's built-in Codex catalog changes between releases; use whatever chat model it ships.
+const codexModel = runtime => runtime.getAllModels().find(m => m.provider === 'openai-codex' && !m.id.includes('spark'));
+
 test('real Pi loader/runtime, native Codex SSE adapter, failover, continuation, reload and old virtual selection', async t => {
     const root = mkdtempSync(join(tmpdir(), 'codex-loader-test-')); t.after(() => rmSync(root, { recursive: true, force: true }));
     const previous = process.env.PI_CODING_AGENT_DIR; process.env.PI_CODING_AGENT_DIR = root;
@@ -58,7 +61,7 @@ test('real Pi loader/runtime, native Codex SSE adapter, failover, continuation, 
         return sse();
     };
     const options = { transport: 'sse', fetch: mockFetch, onResponse: () => { hooks++; } };
-    const model = runtime.getModel('openai-codex', 'gpt-5.5');
+    const model = codexModel(runtime);
     assert.ok(model);
     const result = await runtime.streamSimple(model, { messages: [{ role: 'user', content: 'test', timestamp: Date.now() }] }, options).result();
     assert.equal(result.stopReason, 'stop', result.errorMessage);
@@ -73,11 +76,11 @@ test('real Pi loader/runtime, native Codex SSE adapter, failover, continuation, 
     const virtual = reloaded.runtime.getModel('codex-multi', 'auto');
     const route = await reloaded.runtime.resolveModel(virtual, [result], { reason: 'continuation', thinkingLevel: 'medium' });
     assert.equal(route.model.provider, 'openai-codex');
-    assert.equal(route.model.id, 'gpt-5.5');
+    assert.equal(route.model.id, model.id);
     const resumed = await reloaded.runtime.streamSimple(route.model, { messages: [result] }, options).result();
     assert.equal(resumed.stopReason, 'stop', resumed.errorMessage);
     assert.equal(calls.at(-1), 'b');
-    const legacyAccount = reloaded.runtime.getModel('codex-a', 'gpt-5.5');
+    const legacyAccount = reloaded.runtime.getModel('codex-a', model.id);
     const legacyRoute = await reloaded.runtime.resolveModel(legacyAccount, [], { reason: 'user', thinkingLevel: 'medium' });
     assert.equal(legacyRoute.model.provider, 'openai-codex');
     const throttleCalls = [];
@@ -121,7 +124,7 @@ test('real AgentSession recovers legacy physical/virtual selections on resume, r
     };
     await loader.reload();
     const runtime = await ModelRuntime.create({ authPath: join(root, 'auth.json'), modelsPath: null, modelsStorePath: join(root, 'cache.json'), refreshOnCreate: false });
-    const legacyModel = { ...runtime.getModel('openai-codex', 'gpt-5.5'), provider: legacyProvider, id: 'gpt-6.1-sol', name: 'Legacy dynamically discovered model' };
+    const legacyModel = { ...codexModel(runtime), provider: legacyProvider, id: 'gpt-6.1-sol', name: 'Legacy dynamically discovered model' };
     assert.equal(legacyModel.api, 'openai-codex-responses');
     assert.ok(extensions.extensions[0].handlers.has('session_start'));
     const manager = SessionManager.inMemory(root);

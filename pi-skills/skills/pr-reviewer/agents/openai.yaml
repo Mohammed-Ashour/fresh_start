@@ -1,3 +1,0 @@
-interface:
-  display_name: "PR Reviewer"
-  short_description: "Review pull requests and branches with severity-ranked findings."

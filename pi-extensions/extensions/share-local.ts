@@ -1,20 +1,20 @@
 /**
  * Share Local Extension
  *
- * Exports the session to HTML and opens it in your browser (Chrome) or provides the local path.
+ * Exports the session to HTML and opens it in a local browser or provides the local path.
  *
  * Usage:
- *   /share-local          - Export and open in Chrome
+ *   /share-local          - Export and open locally
  *   /share-local --path   - Show path only (don't open)
  *   /share-local --copy   - Copy the HTML file path to clipboard
  *
  * Requires:
- *   - Google Chrome installed (for --open flag)
+ *   - A supported local browser or OS opener
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 interface ShareLocalOptions {
@@ -23,51 +23,65 @@ interface ShareLocalOptions {
 	copy?: boolean;
 }
 
-function getChromePath(): string | null {
-	const macPaths = [
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-		"/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+interface BrowserTarget {
+	path: string;
+	appName?: string;
+}
+
+function getChromeTarget(): BrowserTarget | null {
+	const macTargets: BrowserTarget[] = [
+		{ path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", appName: "Google Chrome" },
+		{ path: "/Applications/Chromium.app/Contents/MacOS/Chromium", appName: "Chromium" },
+		{ path: "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary", appName: "Google Chrome Canary" },
 	];
-	const linuxPaths = [
-		"/usr/bin/google-chrome",
-		"/usr/bin/google-chrome-stable",
-		"/usr/bin/chromium",
-		"/usr/bin/chromium-browser",
-		"/snap/bin/chromium",
+	const linuxTargets: BrowserTarget[] = [
+		{ path: "/usr/bin/google-chrome" },
+		{ path: "/usr/bin/google-chrome-stable" },
+		{ path: "/usr/bin/chromium" },
+		{ path: "/usr/bin/chromium-browser" },
+		{ path: "/snap/bin/chromium" },
 	];
-	const windowsPaths = [
-		"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-		"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-		`${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+	const windowsTargets: BrowserTarget[] = [
+		{ path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" },
+		{ path: "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" },
+		{ path: `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe` },
 	];
 
 	const platform = process.platform;
-	const paths = platform === "darwin" ? macPaths : platform === "win32" ? windowsPaths : linuxPaths;
+	const targets = platform === "darwin" ? macTargets : platform === "win32" ? windowsTargets : linuxTargets;
 
-	for (const chromePath of paths) {
-		if (existsSync(chromePath)) {
-			return chromePath;
+	for (const target of targets) {
+		if (existsSync(target.path)) {
+			return target;
 		}
 	}
 	return null;
 }
 
-async function openInChrome(filePath: string): Promise<boolean> {
-	const chromePath = getChromePath();
-	if (!chromePath) return false;
-
+function canOpenLocally(): boolean {
 	const platform = process.platform;
+	if (platform === "darwin" || platform === "win32") return true;
+	return existsSync("/usr/bin/xdg-open") || existsSync("/bin/xdg-open") || getChromeTarget() !== null;
+}
+
+async function openInChrome(filePath: string): Promise<boolean> {
+	const chromeTarget = getChromeTarget();
+	const platform = process.platform;
+
 	if (platform === "darwin") {
-		spawn("open", ["-a", "Google Chrome", filePath], { detached: true });
+		if (chromeTarget) {
+			spawn("open", ["-a", chromeTarget.appName ?? chromeTarget.path, filePath], { detached: true });
+		} else {
+			spawn("open", [filePath], { detached: true });
+		}
 	} else if (platform === "win32") {
 		spawn("cmd", ["/c", "start", "", filePath], { detached: true, shell: true });
+	} else if (existsSync("/usr/bin/xdg-open") || existsSync("/bin/xdg-open")) {
+		spawn("xdg-open", [filePath], { detached: true });
+	} else if (chromeTarget) {
+		spawn(chromeTarget.path, [filePath], { detached: true });
 	} else {
-		try {
-			spawn("xdg-open", [filePath], { detached: true });
-		} catch {
-			spawn(chromePath, [filePath], { detached: true });
-		}
+		return false;
 	}
 
 	setTimeout(() => {}, 500);
@@ -87,7 +101,7 @@ function formatTimestamp(ts: number): string {
 	return new Date(ts).toLocaleString();
 }
 
-function generateHtml(sessionName: string | null, entries: any[]): string {
+function generateHtml(sessionName: string | null | undefined, entries: any[]): string {
 	let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -218,9 +232,9 @@ async function copyToClipboard(text: string): Promise<void> {
 
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("share-local", {
-		description: "Export session to HTML and open in browser (--path for path only, --copy to copy path)",
+		description: "Export session to HTML and open locally (--path for path only, --copy to copy path)",
 		getArgumentCompletions: () => [
-			{ value: "--open", label: "--open (open in Chrome)" },
+			{ value: "--open", label: "--open (open locally)" },
 			{ value: "--path", label: "--path (show path only)" },
 			{ value: "--copy", label: "--copy (copy path to clipboard)" },
 		],
@@ -231,7 +245,6 @@ export default function (pi: ExtensionAPI) {
 			ctx.ui.setStatus("share-local", "Exporting session...");
 
 			try {
-				// Generate filename - use project directory (cwd) for easier access
 				const sessionName = session.getSessionName();
 				const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 				const safeName = sessionName
@@ -239,11 +252,9 @@ export default function (pi: ExtensionAPI) {
 					: "session";
 				const filename = `pi-share-${safeName}-${timestamp}.html`;
 
-				// Use project directory (cwd) or fall back to /tmp
-				let outputDir = ctx.cwd;
-				if (!existsSync(outputDir)) {
-					outputDir = "/tmp";
-				}
+				// Keep transcripts out of the project, where they could be committed.
+				const outputDir = join(getAgentDir(), "exports");
+				mkdirSync(outputDir, { recursive: true, mode: 0o700 });
 
 				const outputPath = join(outputDir, filename);
 
@@ -252,25 +263,25 @@ export default function (pi: ExtensionAPI) {
 
 				// Generate and write HTML
 				const html = generateHtml(sessionName, entries);
-				writeFileSync(outputPath, html, "utf-8");
+				writeFileSync(outputPath, html, { encoding: "utf-8", mode: 0o600 });
 
 				// Handle options
 				if (options.copy) {
 					await copyToClipboard(outputPath);
-					ctx.ui.notify("Path copied to clipboard!", "success");
+					ctx.ui.notify("Path copied to clipboard!", "info");
 					ctx.ui.setStatus("share-local", `Copied: ${outputPath}`);
 				} else if (options.pathOnly) {
 					ctx.ui.setStatus("share-local", `HTML: ${outputPath}`);
 					ctx.ui.notify(`HTML exported to:\n${outputPath}`, "info");
 				} else {
-					const chromeAvailable = getChromePath() !== null;
-					if (chromeAvailable) {
+					const openAvailable = canOpenLocally();
+					if (openAvailable) {
 						await openInChrome(outputPath);
-						ctx.ui.notify(`Opening in Chrome:\n${outputPath}`, "success");
+						ctx.ui.notify(`Opening locally:\n${outputPath}`, "info");
 						ctx.ui.setStatus("share-local", `Opened: ${outputPath}`);
 					} else {
 						ctx.ui.notify(
-							`Chrome not found. HTML saved to:\n${outputPath}\n\nOpen it manually with any browser.`,
+							`No supported browser found. HTML saved to:\n${outputPath}\n\nOpen it manually with any browser.`,
 							"warning",
 						);
 						ctx.ui.setStatus("share-local", `HTML: ${outputPath}`);

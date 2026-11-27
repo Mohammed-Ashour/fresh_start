@@ -7,9 +7,9 @@
  * After all questions are answered, results are sent to the agent.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Editor, type EditorTheme, Key, matchesKey, Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 
 // --- Types ---
 
