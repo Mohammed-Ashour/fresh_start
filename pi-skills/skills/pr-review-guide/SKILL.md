@@ -13,7 +13,7 @@ Generate a reviewer-focused guide that reduces cognitive load. The goal is to ex
 4. If the script fell back to `local-git`, tell the user clearly that `gh` is unavailable or unauthenticated, the guide will only be written locally, and they must paste or post it themselves if they want it on GitHub.
 5. Infer 2 to 7 review clusters from the files, commits, PR title/body, and directory structure.
 6. Draft the guide in markdown using the structure from `references/guide-template.md`.
-7. If a `humanizer` skill is available in the client setup, use it on the final prose before writing or posting. Keep the result compact and direct.
+7. If an `unslop` skill is available in the client setup, use it on the final prose before writing or posting. Keep the result compact and direct.
 8. Write the final markdown file into `pr-reviews/` using this filename pattern:
    - `<current-branch>-into-<base-branch>-<yyyy-mm-dd>-pr-review-guide.md`
 9. If the user asked for a GitHub comment and `gh` is available plus authenticated, post the same markdown file as a normal PR comment by running `scripts/post_pr_comment.sh <pr-number> <markdown-file>`.

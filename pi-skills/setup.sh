@@ -8,7 +8,7 @@
 # Usage:
 #   ./setup.sh                    # choose skills interactively
 #   ./setup.sh --all              # install all skills
-#   ./setup.sh humanizer grill-me # install only the named skills
+#   ./setup.sh unslop grill-me # install only the named skills
 #   ./setup.sh --list             # show available skills and their status
 #   ./setup.sh --dry-run          # show what would change
 #   ./setup.sh --force            # overwrite selected installed copies
@@ -51,7 +51,7 @@ Options:
 Examples:
   $(basename "$0")                       # choose skills interactively
   $(basename "$0") --all                 # install every skill
-  $(basename "$0") humanizer grill-me
+  $(basename "$0") unslop grill-me
   $(basename "$0") --all --dry-run
 EOF
 }

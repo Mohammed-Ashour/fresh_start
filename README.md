@@ -32,7 +32,7 @@ Modular macOS development environment setup with interactive multi-select picker
 | `kubernetes` | Docker Desktop, lazydocker, kubectl, Helm, Minikube, K9s |
 | `cli-tools` | bat, eza, ripgrep, zellij |
 | `pi-extensions` | ask-questions, context-usage, exit-command, permission-gate, share-local, codex-accounts, diff-review, diff-review-web, mini-agents, pi-web-access |
-| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, humanizer, mo-presentation, ponytail, ponytail-audit, ponytail-review, pr-rev-guide, pr-review-guide, pr-reviewer, pr-splitter, review, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
+| `pi-skills` | agdr-decide, agdr-visualize, architecture-context, codebase-cleanup-audit, deep-module-reviewer, frontend-skill, grill-me, handoff, mo-presentation, ponytail, ponytail-audit, ponytail-review, pr-review-guide, pr-splitter, review-story, science-pr-review, security-best-practices, show-me, simplify, skipper-audit, skipper-implement, skipper-review, skipper-review-deep, skipper-teach, skipper-test-coverage, unit-test-aaa, unslop |
 
 ## Pi Skills
 
@@ -71,16 +71,12 @@ Existing `~/.p10k.zsh` files are preserved. The installer updates the `ZSH_THEME
 | `frontend-skill` | Visually strong landing pages, apps, and UI |
 | `grill-me` | Stress-test a plan or design via relentless questioning |
 | `handoff` | Compact the conversation into a handoff document |
-| `humanizer` | Remove signs of AI-generated writing |
 | `mo-presentation` | Story-driven, sourced, editable PowerPoint decks: golden-ratio layouts, native charts with callouts, GIFs for change |
 | `ponytail` | Force the laziest solution that actually works |
 | `ponytail-audit` | Whole-repo audit for over-engineering |
 | `ponytail-review` | Code review focused on over-engineering |
-| `pr-rev-guide` | Generate and post a structured PR review guide |
 | `pr-review-guide` | Reviewer guide for long or hard-to-review PRs |
-| `pr-reviewer` | In-depth PR and branch review with severity-ranked findings |
 | `pr-splitter` | Split oversized PRs into smaller scoped PRs |
-| `review` | Correctness-focused code review |
 | `review-story` | Concise narrative walkthrough of PR changes |
 | `science-pr-review` | Stage 0-5 science-model lifecycle gate; used by skipper-review on science PRs |
 | `security-best-practices` | Language/framework security best-practice reviews |
