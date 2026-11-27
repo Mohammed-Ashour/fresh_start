@@ -136,7 +136,8 @@ Or install through the main script:
 - custom answers and skip support
 
 **Context Usage**
-- footer status bar showing current context usage
+- footer context bar: `ctx ████████░░ 84% · 168K/200K · 8% until auto-compact`
+- green below 50%, yellow below 80%, red above; shows the room left before auto-compaction once past 60%
 - warning indicator at 50%+
 
 **Codex Accounts**
