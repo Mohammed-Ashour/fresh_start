@@ -166,7 +166,9 @@ export function computeBreakdown(input: {
 	}
 
 	const contextWindow = input.usage?.contextWindow || input.contextWindow || 0;
-	const real = input.usage?.tokens ?? null;
+	// Before the first model response Pi reports 0 tokens; the fixed parts will still be sent.
+	const reported = input.usage?.tokens ?? null;
+	const real = reported === 0 && input.messages.length === 0 ? null : reported;
 	let estimated = true;
 	if (real !== null) {
 		// Scale the conversation estimate so the parts add up to the real total.

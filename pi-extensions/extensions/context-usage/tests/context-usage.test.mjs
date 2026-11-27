@@ -56,6 +56,12 @@ test("without a real total, it falls back to estimates", () => {
 	assert.equal(b.segments.some((s) => s.category === "buffer"), false);
 });
 
+test("a new session shows the fixed cost as an estimate", () => {
+	const b = computeBreakdown({ systemPrompt: prompt, tools, messages: [], usage: { tokens: 0, contextWindow: 200_000, percent: 0 }, reserveTokens: 16384 });
+	assert.equal(b.estimated, true);
+	assert.ok(b.used > 0);
+});
+
 test("cells always fill the grid and small parts stay visible", () => {
 	const b = computeBreakdown({ systemPrompt: prompt, tools, messages, usage: { tokens: 50_000, contextWindow: 1_000_000, percent: 5 }, reserveTokens: 16384 });
 	for (const n of [20, 100]) {
