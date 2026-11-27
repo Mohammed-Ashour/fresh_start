@@ -5,7 +5,6 @@ diff-review	/diff-review: review a git diff in the TUI
 diff-review-web	/diff-review-web: review a git diff in the browser
 exit-command.ts	/exit as an alias for /quit
 mini-agents	/mini-agents and model-managed named background agents
-permission-gate.ts	Blocks dangerous commands (modes in permissions.json)
-permissions.json	Permission modes for permission-gate (default: safeMode)
+permission-gate	Safe mode: blocks catastrophic commands, asks only for risky ones
 share-local.ts	/share-local: export the session to HTML
 codex-accounts	Multi-account ChatGPT/Codex sign-in, rotation, and usage

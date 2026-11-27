@@ -118,14 +118,13 @@ Same status lines and safe update tracking as the skills script. It also warns w
 ### Included extensions and packages
 
 **Permission Gate**
-- 6 modes: `default`, `acceptEdits`, `fullAuto`, `safeMode`, `bypassPermissions`, `plan`
-- catastrophic and dangerous command blocking
-- protected path blocking
-- exempt command support
-- session-scoped approvals
-- `/permissions` to switch modes
-- `Ctrl+Shift+P` to cycle modes
-- default shipped config: `safeMode`
+- modes: `plan`, `default`, `acceptEdits`, `safeMode` (default), `bypassPermissions`
+- safe mode stays quiet for normal work and asks only for risky actions (force push, discarding uncommitted changes, deleting outside the project, publishing, destroying infrastructure)
+- blocks catastrophic commands and secret paths (`~/.ssh`, `~/.aws`, auth files) in every mode, including through `read`/`grep`
+- parses shell commands, so `echo ok; rm -rf ~`, `bash -c`, `$(...)` and `xargs` cannot hide anything
+- optional macOS sandbox for bash (`"sandbox": true`)
+- `/permissions`, `/permissions-explain <command>`, `/sandbox`; `Ctrl+Shift+P` cycles modes
+- config: `~/.pi/agent/permissions.json`; see [its README](pi-extensions/extensions/permission-gate/README.md)
 
 **Ask Questions**
 - multi-question UI

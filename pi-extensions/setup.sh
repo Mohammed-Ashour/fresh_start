@@ -122,6 +122,36 @@ state_of() {
     fi
 }
 
+# permission-gate used to be permission-gate.ts plus permissions.json in the
+# extensions folder. Keep the user's mode in the new config location and move the
+# old files out of the folder Pi loads, so two gates never run at once.
+migrate_permission_gate() {
+    local legacy="$TARGET/permission-gate.ts" legacy_config="$TARGET/permissions.json"
+    local backup="$PI_DIR/backups/permission-gate-$(date +%Y%m%d%H%M%S)" temporary
+    [[ -e "$legacy" || -e "$legacy_config" ]] || return 0
+    if [[ "$DRY_RUN" == true ]]; then
+        row "${GREEN}↻${NC}" "legacy gate" "$GREEN" "would move to backups" "old permission-gate.ts / permissions.json"
+        return 0
+    fi
+    mkdir -p "$backup"
+    if [[ -f "$legacy_config" && ! -e "$PI_DIR/permissions.json" ]] && command -v node >/dev/null 2>&1; then
+        node -e '
+            const fs = require("fs");
+            const old = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const mode = old.mode === "fullAuto" ? "safeMode" : old.mode;
+            fs.writeFileSync(process.argv[2], JSON.stringify(mode ? { mode } : {}, null, 2) + "\n");
+        ' "$legacy_config" "$PI_DIR/permissions.json" || true
+    fi
+    [[ -e "$legacy" ]] && mv "$legacy" "$backup/"
+    [[ -e "$legacy_config" ]] && mv "$legacy_config" "$backup/"
+    if [[ -f "$STATE_FILE" ]]; then
+        temporary="$STATE_FILE.$$.tmp"
+        awk -F '\t' '$1 != "permission-gate.ts" && $1 != "permissions.json"' "$STATE_FILE" > "$temporary"
+        mv "$temporary" "$STATE_FILE"
+    fi
+    row "${GREEN}↻${NC}" "legacy gate" "$GREEN" "moved to backups" "${backup/#$HOME/~}"
+}
+
 row() {
     printf "  %s %-20s %s%-28s%s %s%s%s\n" "$1" "$2" "$3" "$4" "$NC" "$DIM" "$5" "$NC"
 }
@@ -266,6 +296,10 @@ for name in "${TODO[@]}"; do
         row "${GREEN}↻${NC}" "$name" "$GREEN" "$([[ "$DRY_RUN" == true ]] && echo "would overwrite" || echo overwritten)" "$(describe "$name")"
         overwritten=$((overwritten + 1))
     fi
+done
+
+for name in "${TODO[@]}"; do
+    [[ "$name" == permission-gate ]] && migrate_permission_gate
 done
 
 echo
