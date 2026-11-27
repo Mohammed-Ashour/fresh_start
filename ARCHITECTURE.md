@@ -10,7 +10,7 @@ Verified on 2026-10-11 against `README.md`, installer entry points, and the Code
 
 ## System Overview
 
-`init_macos.sh` delegates Pi resource installation to category scripts. `pi-extensions/setup.sh` copies selected files/directories into the agent directory and records hashes to avoid overwriting local edits. Pi later loads an extension's `index.ts`. The Codex extension overrides the native `openai-codex` provider while keeping its OAuth flow and model catalog.
+`init_macos.sh` owns category selection and system setup. Its core category installs Homebrew, Zsh, Oh My Zsh, Git, Powerlevel10k, and the portable prompt configuration from `configs/zsh/p10k.zsh`. `pi-extensions/setup.sh` copies selected files/directories into the agent directory and records hashes to avoid overwriting local edits. Pi later loads an extension's `index.ts`. The Codex extension overrides the native `openai-codex` provider while keeping its OAuth flow and model catalog.
 
 ## Architecture Diagram
 
@@ -34,7 +34,8 @@ flowchart TD
 
 ## Runtime Entry Points
 
-- `init_macos.sh`: setup categories and dry-run handling.
+- `init_macos.sh`: setup categories, dry-run handling, and core Zsh/Powerlevel10k configuration.
+- `configs/zsh/p10k.zsh`: portable lean Powerlevel10k prompt configuration installed as `~/.p10k.zsh`.
 - `pi-extensions/setup.sh`: extension installer, source descriptions in `pi-extensions/manifest.tsv`.
 - `pi-skills/setup.sh`: skill installer.
 - `pi-extensions/extensions/codex-accounts/index.ts`: asynchronous Pi extension factory, `/codex` and `/codex-usage`, session lifecycle events.
@@ -43,6 +44,7 @@ flowchart TD
 ## Architectural Layers
 
 - Installer scripts depend on `lib/installer-ui.sh` for selection and confirmation.
+- `setup_core` installs the Powerlevel10k repository and copies `configs/zsh/p10k.zsh` without overwriting an existing user config; it updates the theme selection in `~/.zshrc` after confirmation.
 - `index.ts` registers the provider and coordinates commands, quota polling, lifecycle cleanup and recovery of account-specific model selections. Recovery refreshes the native auth availability snapshot and moves the selection to `openai-codex` without changing the model ID.
 - `accounts.ts` depends on Pi's public credential runtime and native provider. It owns account archiving, removal, defaults and one-time repair.
 - `rotation.ts` depends on `accounts.ts` and quota parsing. It wraps native event streams without changing the selected model or transcript.
