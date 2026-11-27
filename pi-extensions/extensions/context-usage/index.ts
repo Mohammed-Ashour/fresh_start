@@ -3,11 +3,11 @@
  *
  * Footer: a bar colored by what fills the context window, for example
  *
- *   ctx ███▓▓▓▒▒▒░░░░░░░░░░░ 31% · 62K/200K
+ *   ctx ███████░░░░░░░░░░░░▒ 31% 62K/200K  ●system ●tools ●memory ●skills ●chat ●output
  *
- * where each color is a category (system prompt, tools, memory files, skills,
- * messages, tool results). Past 60% it also shows the room left before Pi's
- * automatic compaction.
+ * Each color is a category (system prompt, tools, memory files, skills, chat
+ * messages, tool output); the legend names the ones present. Past 60% it also
+ * shows the room left before Pi's automatic compaction.
  *
  * /context: a detailed view like Claude Code's, with a 10×10 grid, per-category
  * token counts, memory files, skills, the largest tools, and message counts.
@@ -51,6 +51,20 @@ const COLORS: Record<Category, ThemeColor> = {
 	toolResults: "syntaxString",
 	free: "dim",
 	buffer: "dim",
+};
+
+/** Short legend names for the footer. */
+const SHORT_LABELS: Record<Category, string> = {
+	system: "system",
+	tools: "tools",
+	mcp: "mcp",
+	extensionTools: "ext",
+	memory: "memory",
+	skills: "skills",
+	messages: "chat",
+	toolResults: "output",
+	free: "free",
+	buffer: "buffer",
 };
 
 /** Footer glyphs: used space is solid, the compaction buffer is shaded, free space is light. */
@@ -112,12 +126,17 @@ export default function (pi: ExtensionAPI) {
 		const bar = allocateCells(b, FOOTER_CELLS).map((c) => paint(c, FOOTER_GLYPH[c] ?? "█")).join("");
 		const percent = (b.used / b.contextWindow) * 100;
 		const tone: ThemeColor = percent >= 80 ? "error" : percent >= 50 ? "warning" : "text";
-		let label = `${b.estimated ? "~" : ""}${Math.round(percent)}% · ${formatTokens(b.used)}/${formatTokens(b.contextWindow)}`;
+		let label = `${b.estimated ? "~" : ""}${Math.round(percent)}% ${formatTokens(b.used)}/${formatTokens(b.contextWindow)}`;
 		if (reserveTokens !== undefined && percent >= 60) {
 			const left = Math.max(0, Math.round(((b.contextWindow - reserveTokens - b.used) / b.contextWindow) * 100));
-			label += left > 0 ? ` · ${left}% until auto-compact` : " · auto-compact next";
+			label += left > 0 ? ` · compact in ${left}%` : " · compacting next";
 		}
-		return `${theme ? theme.fg("dim", "ctx") : "ctx"} ${bar} ${theme ? theme.fg(tone, label) : label}`;
+		// Minimal legend: a colored dot and a short name for each part present in the bar.
+		const legend = b.segments
+			.filter((s) => s.category !== "free" && s.category !== "buffer" && s.tokens > 0)
+			.map((s) => `${paint(s.category, "●")}${theme ? theme.fg("dim", SHORT_LABELS[s.category]) : SHORT_LABELS[s.category]}`)
+			.join(" ");
+		return `${theme ? theme.fg("dim", "ctx") : "ctx"} ${bar} ${theme ? theme.fg(tone, label) : label}  ${legend}`;
 	}
 
 	function update(ctx: ExtensionContext) {
